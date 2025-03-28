@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="black">#FF000000</color>
+    <color name="white">#FFFFFFFF</color>
+
+    <color name="primary">#6D2E46</color>
+    <color name="primaryVariant">#45152B</color>
+    <color name="OnPrimary">#ECE2D0</color> //write
+
+    <color name="primary_night_theme">#ECE2D0</color>
+    <color name="primaryVariant_night_theme">#766262</color>
+    <color name="OnPrimary_night_theme">#45152B</color> //write
+
+    <color name="statusBarColor">#45152B</color>
+
+    <color name="secondary">#A26769</color>
+    <color name="secondaryVariant">#CEBEBE</color>
+    <color name="Onsecondary">#381D1D</color>
+
+    <color name="background">#FBFAFA</color>
+    <color name="backgroundNight">#1F0303</color>
+    <color name="contrast">#904345</color>
+    <color name="icons">#D5B9B2</color>
+</resources>
