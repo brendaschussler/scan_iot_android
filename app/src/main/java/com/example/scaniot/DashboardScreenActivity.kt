@@ -24,20 +24,31 @@ class DashboardScreenActivity : AppCompatActivity() {
         FirebaseAuth.getInstance()
     }
 
-
-
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         setContentView( binding.root )
 
         initializeToolbar()
+        initializeClickEvents()
 
         ViewCompat.setOnApplyWindowInsetsListener(findViewById(R.id.main)) { v, insets ->
             val systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
             v.setPadding(systemBars.left, systemBars.top, systemBars.right, systemBars.bottom)
             insets
         }
+    }
+
+    private fun navigateToScan(){
+        binding.btnScanDevices.setOnClickListener {
+            startActivity(
+                Intent(this, ScanDevicesActivity::class.java)
+            )
+        }
+    }
+
+    private fun initializeClickEvents() {
+        navigateToScan()
     }
 
     private fun initializeToolbar() {
@@ -84,8 +95,6 @@ class DashboardScreenActivity : AppCompatActivity() {
             }
             .create()
             .show()
-
-
     }
 
 }
