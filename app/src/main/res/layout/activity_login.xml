@@ -10,7 +10,7 @@
     tools:context=".LoginActivity">
 
     <com.google.android.material.textfield.TextInputLayout
-        android:id="@+id/textInputLayout"
+        android:id="@+id/textInputLayoutLoginEmail"
         android:layout_width="0dp"
         android:layout_height="wrap_content"
         android:layout_marginStart="20dp"
@@ -22,19 +22,20 @@
         app:layout_constraintTop_toBottomOf="@+id/textView4">
 
         <com.google.android.material.textfield.TextInputEditText
+            android:id="@+id/editLoginEmail"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:drawableStart="@drawable/baseline_mail_outline_24"
             android:drawablePadding="8dp"
             android:drawableTint="#C3A9A9"
-            android:hint="Username"
+            android:hint="E-mail"
             android:inputType="text|textEmailAddress"
             android:padding="20dp"
             android:textSize="18sp" />
     </com.google.android.material.textfield.TextInputLayout>
 
     <com.google.android.material.textfield.TextInputLayout
-        android:id="@+id/textInputLayout2"
+        android:id="@+id/textInputLayoutLoginPassword"
         android:layout_width="0dp"
         android:layout_height="wrap_content"
         android:layout_marginStart="20dp"
@@ -44,9 +45,10 @@
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintHorizontal_bias="0.5"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@+id/textInputLayout">
+        app:layout_constraintTop_toBottomOf="@+id/textInputLayoutLoginEmail">
 
         <com.google.android.material.textfield.TextInputEditText
+            android:id="@+id/editLoginPassword"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:drawableStart="@drawable/baseline_lock_outline_24"
@@ -108,7 +110,7 @@
         app:layout_constraintTop_toBottomOf="@+id/textView3" />
 
     <Button
-        android:id="@+id/button"
+        android:id="@+id/btnLogin"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_marginTop="20dp"
@@ -118,12 +120,12 @@
         android:drawableTint="#FFFFFF"
         android:elevation="8dp"
         android:padding="18dp"
-        android:text="Login"
+        android:text="Log in"
         android:textSize="22sp"
         app:cornerRadius="50dp"
         app:iconPadding="15dp"
         app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintTop_toBottomOf="@+id/textInputLayout2" />
+        app:layout_constraintTop_toBottomOf="@+id/textInputLayoutLoginPassword" />
 
     <ImageView
         android:id="@+id/imageView3"
