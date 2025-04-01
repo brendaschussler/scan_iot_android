@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "878751403928",
+    "project_id": "scaniot",
+    "storage_bucket": "scaniot.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:878751403928:android:b8a8d08dacee5759a5e5ed",
+        "android_client_info": {
+          "package_name": "com.example.scaniot"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDA7SGR2CrAoz26nMrxUlBMhhw9e-V-OyM"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
