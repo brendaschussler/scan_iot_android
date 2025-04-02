@@ -37,6 +37,75 @@ class ScanDevicesActivity : AppCompatActivity() {
         FirebaseFirestore.getInstance()
     }
 
+    val currentUserId = firebaseAuth.currentUser?.uid ?: ""
+    val fakeDevices = listOf(
+        Device(
+            ip = "192.168.1.101",
+            mac = "00:1A:2B:3C:4D:5E",
+            name = "Smart TV",
+            description = "Samsung 4K UHD",
+            manufacturer = "Samsung",
+            userId = currentUserId
+        ),
+        Device(
+            ip = "192.168.1.102",
+            mac = "00:1B:2C:3D:4E:5F",
+            name = "Smartphone",
+            description = "Android Phone",
+            manufacturer = "Xiaomi",
+            userId = currentUserId
+        ),
+        Device(
+            ip = "192.168.1.103",
+            mac = "00:1C:2D:3E:4F:5A",
+            name = "Notebook",
+            description = "Work laptop",
+            manufacturer = "Dell",
+            userId = currentUserId
+        ),
+        Device(
+            ip = "192.168.1.104",
+            mac = "00:1D:2E:3F:4A:5B",
+            name = "Smart Light",
+            description = "RGB Bulb",
+            manufacturer = "Philips",
+            userId = currentUserId
+        ),
+        Device(
+            ip = "192.168.1.105",
+            mac = "00:1E:2F:3A:4B:5C",
+            name = "Security Camera",
+            description = "Outdoor camera",
+            manufacturer = "TP-Link",
+            userId = currentUserId
+        ),
+        Device(
+            ip = "192.168.1.105",
+            mac = "00:1E:2F:3A:4B:5C",
+            name = "Security Camera",
+            description = "Outdoor camera",
+            manufacturer = "TP-Link",
+            userId = currentUserId
+        ),
+        Device(
+            ip = "192.168.1.105",
+            mac = "00:1E:2F:3A:4B:5C",
+            name = "Security Camera",
+            description = "Outdoor camera",
+            manufacturer = "TP-Link",
+            userId = currentUserId
+        ),
+        Device(
+            ip = "192.168.1.105",
+            mac = "00:1E:2F:3A:4B:5C",
+            name = "Security Camera",
+            description = "Outdoor camera",
+            manufacturer = "TP-Link",
+            userId = currentUserId
+        )
+    )
+
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
@@ -57,8 +126,35 @@ class ScanDevicesActivity : AppCompatActivity() {
 
     private fun startScanningDevices() {
         binding.btnStartScan.setOnClickListener {
-            loadDevices()
+            //loadDevices()
+            loadDevicesWithSavedData()
         }
+    }
+
+    private fun loadDevicesWithSavedData() {
+        val currentUser = firebaseAuth.currentUser
+        if (currentUser == null) {
+            loadDevices()
+            return
+        }
+
+        firestore.collection("saved_devices")
+            .document(currentUser.uid)
+            .collection("devices")
+            .get()
+            .addOnSuccessListener { documents ->
+                val savedDevices = documents.map { it.toObject(Device::class.java) }
+
+                // Mescla a lista fake com os dados salvos
+                val mergedDevices = fakeDevices.map { fakeDevice ->
+                    savedDevices.find { it.mac == fakeDevice.mac } ?: fakeDevice
+                }
+
+                scanDevicesAdapter.addList(mergedDevices)
+            }
+            .addOnFailureListener {
+                loadDevices()
+            }
     }
 
     private fun setupRecyclerView() {
@@ -97,6 +193,7 @@ class ScanDevicesActivity : AppCompatActivity() {
                     description = dialogView.findViewById<TextInputEditText>(R.id.editDescription).text.toString()
                 )
                 saveDeviceToUserCollection(editedDevice)
+                loadDevicesWithSavedData()
             }
             .setNegativeButton("Cancel", null)
             .create()
@@ -127,77 +224,6 @@ class ScanDevicesActivity : AppCompatActivity() {
     }
 
     private fun loadDevices() {
-
-        val currentUserId = firebaseAuth.currentUser?.uid ?: ""
-
-        // Lista fictícia de dispositivos - substitua por sua lógica real de carregamento
-        val fakeDevices = listOf(
-            Device(
-                ip = "192.168.1.101",
-                mac = "00:1A:2B:3C:4D:5E",
-                name = "Smart TV",
-                description = "Samsung 4K UHD",
-                manufacturer = "Samsung",
-                userId = currentUserId
-            ),
-            Device(
-                ip = "192.168.1.102",
-                mac = "00:1B:2C:3D:4E:5F",
-                name = "Smartphone",
-                description = "Android Phone",
-                manufacturer = "Xiaomi",
-                userId = currentUserId
-            ),
-            Device(
-                ip = "192.168.1.103",
-                mac = "00:1C:2D:3E:4F:5A",
-                name = "Notebook",
-                description = "Work laptop",
-                manufacturer = "Dell",
-                userId = currentUserId
-            ),
-            Device(
-                ip = "192.168.1.104",
-                mac = "00:1D:2E:3F:4A:5B",
-                name = "Smart Light",
-                description = "RGB Bulb",
-                manufacturer = "Philips",
-                userId = currentUserId
-            ),
-            Device(
-                ip = "192.168.1.105",
-                mac = "00:1E:2F:3A:4B:5C",
-                name = "Security Camera",
-                description = "Outdoor camera",
-                manufacturer = "TP-Link",
-                userId = currentUserId
-            ),
-            Device(
-                ip = "192.168.1.105",
-                mac = "00:1E:2F:3A:4B:5C",
-                name = "Security Camera",
-                description = "Outdoor camera",
-                manufacturer = "TP-Link",
-                userId = currentUserId
-            ),
-            Device(
-                ip = "192.168.1.105",
-                mac = "00:1E:2F:3A:4B:5C",
-                name = "Security Camera",
-                description = "Outdoor camera",
-                manufacturer = "TP-Link",
-                userId = currentUserId
-            ),
-            Device(
-                ip = "192.168.1.105",
-                mac = "00:1E:2F:3A:4B:5C",
-                name = "Security Camera",
-                description = "Outdoor camera",
-                manufacturer = "TP-Link",
-                userId = currentUserId
-            )
-        )
-
         scanDevicesAdapter.addList(fakeDevices)
     }
 
