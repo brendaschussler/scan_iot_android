@@ -8,7 +8,9 @@ import androidx.recyclerview.widget.RecyclerView.ViewHolder
 import com.example.scaniot.databinding.ItemDeviceBinding
 import androidx.recyclerview.widget.RecyclerView
 
-class ScanDevicesAdapter : RecyclerView.Adapter<ScanDevicesAdapter.ScanDeviceViewHolder>() {
+class ScanDevicesAdapter(
+    private val onEditClick: (Device) -> Unit
+) : RecyclerView.Adapter<ScanDevicesAdapter.ScanDeviceViewHolder>() {
 
     private var listScanDevices = emptyList<Device>()
 
@@ -22,11 +24,20 @@ class ScanDevicesAdapter : RecyclerView.Adapter<ScanDevicesAdapter.ScanDeviceVie
     ) : RecyclerView.ViewHolder(binding.root) {
 
         fun bind(device: Device) {
-            binding.txtDeviceName.text = device.name
-            binding.txtDescription.text = device.description
-            binding.txtMacAdress.text = device.mac
-            binding.txtIpAdress.text = device.ip
-            binding.txtManufacturer.text = device.manufacturer
+            binding.apply {
+                txtDeviceName.text = device.name
+                txtDescription.text = device.description
+                txtMacAdress.text = device.mac
+                txtIpAdress.text = device.ip
+                txtManufacturer.text = device.manufacturer
+
+                btnEditDevice.setOnClickListener {
+                    onEditClick(device)
+                }
+
+                // Esconde o botão de salvar pois não será usado agora
+                btnSaveDevice.visibility = View.GONE
+            }
         }
     }
 
