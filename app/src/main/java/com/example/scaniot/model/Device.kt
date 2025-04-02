@@ -7,7 +7,4 @@ data class Device(
     var description: String = "unknown",
     val manufacturer: String = "unknown",
     var photoUrl: String? = null
-) {
-    // Construtor sem parâmetros exigido pelo Firestore
-    constructor() : this("", "", "unknown", "unknown", "unknown", null)
-}
+)

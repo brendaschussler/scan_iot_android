@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent">
 
@@ -27,13 +28,14 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginBottom="8dp"
-            android:hint="Nome">
+            android:hint="Device name">
 
             <com.google.android.material.textfield.TextInputEditText
                 android:id="@+id/editName"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:maxLines="1"/>
+                android:maxLines="1"
+                android:textSize="20sp" />
         </com.google.android.material.textfield.TextInputLayout>
 
         <com.google.android.material.textfield.TextInputLayout
@@ -41,23 +43,28 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginBottom="16dp"
-            android:hint="Descrição">
+            android:hint="Device description">
 
             <com.google.android.material.textfield.TextInputEditText
                 android:id="@+id/editDescription"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:maxLines="3"/>
+                android:maxLines="3"
+                android:textSize="20sp" />
         </com.google.android.material.textfield.TextInputLayout>
 
-        <!-- Botão para alterar foto -->
         <Button
-            android:id="@+id/btnChangePhoto"
+            android:id="@+id/button"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="Alterar Foto"
-            style="@style/Widget.MaterialComponents.Button.OutlinedButton"
-            android:layout_marginBottom="16dp"/>
+            android:drawableTop="@drawable/outline_add_a_photo_24"
+            android:padding="8dp"
+            android:text="Add Picture"
+            android:textAllCaps="false"
+            android:textSize="20sp"
+            app:iconPadding="5dp" />
+
+        <!-- Botão para alterar foto -->
 
     </LinearLayout>
 </ScrollView>

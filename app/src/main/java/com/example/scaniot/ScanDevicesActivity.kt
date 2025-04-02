@@ -4,46 +4,45 @@ import android.app.AlertDialog
 import android.content.Intent
 import android.os.Bundle
 import android.view.View
-import android.widget.SearchView
 import androidx.activity.enableEdgeToEdge
-import androidx.activity.viewModels
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
-import androidx.lifecycle.Lifecycle
 import androidx.recyclerview.widget.LinearLayoutManager
-import com.bumptech.glide.Glide
 import com.example.scaniot.databinding.ActivityScanDevicesBinding
-import com.example.scaniot.databinding.DialogEditDeviceBinding
 import com.example.scaniot.model.Device
-import com.example.scaniot.model.DeviceAdapter
+import com.example.scaniot.model.ScanDevicesAdapter
 import com.google.firebase.auth.FirebaseAuth
-import androidx.lifecycle.lifecycleScope
-import androidx.lifecycle.repeatOnLifecycle
-import kotlinx.coroutines.flow.collect
-import kotlinx.coroutines.launch
+import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.storage.FirebaseStorage
 
 class ScanDevicesActivity : AppCompatActivity() {
 
-    private val binding by lazy {
-        ActivityScanDevicesBinding.inflate(layoutInflater)
+    private lateinit var scanDevicesAdapter: ScanDevicesAdapter
+    private lateinit var binding: ActivityScanDevicesBinding
+
+    private val firebaseAuth by lazy {
+        FirebaseAuth.getInstance()
     }
 
-    private val viewModel: ScanDevicesViewModel by viewModels()
-    private lateinit var adapter: DeviceAdapter
-    private val firebaseAuth by lazy { FirebaseAuth.getInstance() }
+    private val storage by lazy {
+        FirebaseStorage.getInstance()
+    }
+
+    private val firestore by lazy {
+        FirebaseFirestore.getInstance()
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+
+        binding = ActivityScanDevicesBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
         initializeToolbar()
         setupRecyclerView()
-        setupObservers()
-        setupClickListeners()
-
-        viewModel.scanNetwork()
+        startScanningDevices()
 
         ViewCompat.setOnApplyWindowInsetsListener(findViewById(R.id.main)) { v, insets ->
             val systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
@@ -52,102 +51,113 @@ class ScanDevicesActivity : AppCompatActivity() {
         }
     }
 
+    private fun startScanningDevices() {
+        binding.btnStartScan.setOnClickListener {
+            loadDevices()
+        }
+    }
+
     private fun setupRecyclerView() {
-        adapter = DeviceAdapter(
-            onEditClick = { device -> showEditDialog(device) },
-            onSaveClick = { device -> viewModel.saveDevice(device) }
+        scanDevicesAdapter = ScanDevicesAdapter()
+        binding.rvListScanDevices.apply {
+            adapter = scanDevicesAdapter
+            layoutManager = LinearLayoutManager(this@ScanDevicesActivity)
+            setHasFixedSize(true)
+
+            // Configurações adicionais para a barra de rolagem
+            isVerticalScrollBarEnabled = true
+            scrollBarStyle = View.SCROLLBARS_OUTSIDE_OVERLAY
+        }
+    }
+
+    private fun loadDevices() {
+        // Lista fictícia de dispositivos - substitua por sua lógica real de carregamento
+        val fakeDevices = listOf(
+            Device(
+                ip = "192.168.1.101",
+                mac = "00:1A:2B:3C:4D:5E",
+                name = "Smart TV",
+                description = "Samsung 4K UHD",
+                manufacturer = "Samsung"
+            ),
+            Device(
+                ip = "192.168.1.102",
+                mac = "00:1B:2C:3D:4E:5F",
+                name = "Smartphone",
+                description = "Android Phone",
+                manufacturer = "Xiaomi"
+            ),
+            Device(
+                ip = "192.168.1.103",
+                mac = "00:1C:2D:3E:4F:5A",
+                name = "Notebook",
+                description = "Work laptop",
+                manufacturer = "Dell"
+            ),
+            Device(
+                ip = "192.168.1.104",
+                mac = "00:1D:2E:3F:4A:5B",
+                name = "Smart Light",
+                description = "RGB Bulb",
+                manufacturer = "Philips"
+            ),
+            Device(
+                ip = "192.168.1.105",
+                mac = "00:1E:2F:3A:4B:5C",
+                name = "Security Camera",
+                description = "Outdoor camera",
+                manufacturer = "TP-Link"
+            ),
+            Device(
+                ip = "192.168.1.105",
+                mac = "00:1E:2F:3A:4B:5C",
+                name = "Security Camera",
+                description = "Outdoor camera",
+                manufacturer = "TP-Link"
+            ),
+            Device(
+                ip = "192.168.1.105",
+                mac = "00:1E:2F:3A:4B:5C",
+                name = "Security Camera",
+                description = "Outdoor camera",
+                manufacturer = "TP-Link"
+            ),
+            Device(
+                ip = "192.168.1.105",
+                mac = "00:1E:2F:3A:4B:5C",
+                name = "Security Camera",
+                description = "Outdoor camera",
+                manufacturer = "TP-Link"
+            )
         )
 
-        binding.devicesRecyclerView.apply {
-            layoutManager = LinearLayoutManager(this@ScanDevicesActivity)
-            adapter = this@ScanDevicesActivity.adapter
-            setHasFixedSize(true)
-        }
-    }
-
-    private fun showEditDialog(device: Device) {
-        val dialogBinding = DialogEditDeviceBinding.inflate(layoutInflater)
-
-        dialogBinding.editName.setText(device.name)
-        dialogBinding.editDescription.setText(device.description)
-
-        Glide.with(this)
-            .load(device.photoUrl ?: R.drawable.ic_device_unknown)
-            .into(dialogBinding.devicePhoto)
-
-        AlertDialog.Builder(this)
-            .setTitle("Editar Dispositivo")
-            .setView(dialogBinding.root)
-            .setPositiveButton("Salvar") { _, _ ->
-                val updatedDevice = device.copy(
-                    name = dialogBinding.editName.text.toString(),
-                    description = dialogBinding.editDescription.text.toString()
-                )
-                viewModel.saveDevice(updatedDevice)
-            }
-            .setNegativeButton("Cancelar", null)
-            .show()
-    }
-
-    private fun setupObservers() {
-        // Para dispositivos
-        lifecycleScope.launch {
-            repeatOnLifecycle(Lifecycle.State.STARTED) {
-                viewModel.devices.collect { devices ->
-                    adapter.submitList(devices)
-                }
-            }
-        }
-
-        // Para loading state
-        lifecycleScope.launch {
-            repeatOnLifecycle(Lifecycle.State.STARTED) {
-                viewModel.isLoading.collect { isLoading ->
-                    binding.progressBar.visibility = if (isLoading) View.VISIBLE else View.GONE
-                }
-            }
-        }
-    }
-
-    private fun setupClickListeners() {
-        binding.searchView.setOnQueryTextListener(object : SearchView.OnQueryTextListener {
-            override fun onQueryTextSubmit(query: String?): Boolean = false
-
-            override fun onQueryTextChange(newText: String?): Boolean {
-                viewModel.filterDevices(newText.orEmpty())
-                return true
-            }
-        })
-
-        binding.btnLogoutScanDevices.setOnClickListener {
-            logoutUser()
-        }
+        scanDevicesAdapter.addList(fakeDevices)
     }
 
     private fun initializeToolbar() {
         val toolbar = binding.includeTbScanDevices.tbMain
         setSupportActionBar(toolbar)
         supportActionBar?.apply {
-            title = "ScanIoT"
+            title = "Scan Devices"
             setDisplayHomeAsUpEnabled(true)
+        }
+
+        binding.btnLogoutScanDevices.setOnClickListener {
+            logoutUser()
         }
     }
 
     private fun logoutUser() {
         AlertDialog.Builder(this)
             .setTitle("Logout")
-            .setMessage("Tem certeza que deseja sair?")
-            .setNegativeButton("Cancelar") { dialog, _ -> dialog.dismiss() }
-            .setPositiveButton("Sair") { _, _ ->
+            .setMessage("Are you sure you want to log out")
+            .setNegativeButton("Cancel") { dialog, _ -> dialog.dismiss() }
+            .setPositiveButton("Yes") { _, _ ->
                 firebaseAuth.signOut()
                 startActivity(Intent(this, LoginActivity::class.java))
                 finish()
             }
+            .create()
             .show()
-    }
-
-    override fun onSupportNavigateUp(): Boolean {
-        onBackPressed()
-        return true
     }
 }
