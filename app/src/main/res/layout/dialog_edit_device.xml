@@ -11,18 +11,19 @@
         android:padding="24dp">
 
         <!-- Foto do dispositivo (clicável para alterar) -->
-        <ImageView
-            android:id="@+id/devicePhoto"
-            android:layout_width="120dp"
-            android:layout_height="120dp"
-            android:layout_gravity="center_horizontal"
-            android:src="@drawable/ic_device_unknown"
-            android:contentDescription="Foto do dispositivo"
-            android:background="@color/white"
-            android:padding="8dp"
-            android:layout_marginBottom="16dp"/>
 
         <!-- Campos editáveis -->
+        <ImageView
+            android:id="@+id/selectedImageDevice"
+            android:layout_width="271dp"
+            android:layout_height="168dp"
+            android:layout_gravity="center_horizontal"
+            android:layout_marginBottom="16dp"
+            android:background="@color/white"
+            android:contentDescription="Foto do dispositivo"
+            android:padding="8dp"
+            android:src="@drawable/ic_device_unknown" />
+
         <com.google.android.material.textfield.TextInputLayout
             style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
             android:layout_width="match_parent"
@@ -54,12 +55,25 @@
         </com.google.android.material.textfield.TextInputLayout>
 
         <Button
-            android:id="@+id/button"
+            android:id="@+id/btnLoadImageGallery"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:drawableTop="@drawable/outline_add_a_photo_24"
+            android:drawableTop="@drawable/add_photo_gallery_24"
+            android:drawableTint="#FFFFFF"
             android:padding="8dp"
-            android:text="Add Picture"
+            android:text="Load Image from Gallery"
+            android:textAllCaps="false"
+            android:textSize="20sp"
+            app:iconPadding="5dp" />
+
+        <Button
+            android:id="@+id/btnOpenCamera"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:drawableTop="@drawable/add_photo_camera_24"
+            android:drawableTint="#FFFFFF"
+            android:padding="8dp"
+            android:text="Open Camera"
             android:textAllCaps="false"
             android:textSize="20sp"
             app:iconPadding="5dp" />

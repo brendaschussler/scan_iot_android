@@ -7,6 +7,8 @@ import androidx.recyclerview.widget.RecyclerView.Adapter
 import androidx.recyclerview.widget.RecyclerView.ViewHolder
 import com.example.scaniot.databinding.ItemDeviceBinding
 import androidx.recyclerview.widget.RecyclerView
+import com.bumptech.glide.Glide
+import com.example.scaniot.R
 
 class ScanDevicesAdapter(
     private val onEditClick: (Device) -> Unit
@@ -30,6 +32,16 @@ class ScanDevicesAdapter(
                 txtMacAdress.text = device.mac
                 txtIpAdress.text = device.ip
                 txtManufacturer.text = device.manufacturer
+
+                // Carrega a imagem do dispositivo se existir
+                if (device.photoUrl != null) {
+                    Glide.with(itemView.context)
+                        .load(device.photoUrl)
+                        .placeholder(R.drawable.ic_device_unknown) // Imagem padrão
+                        .into(imgDevice)
+                } else {
+                    imgDevice.setImageResource(R.drawable.ic_device_unknown)
+                }
 
                 btnEditDevice.setOnClickListener {
                     onEditClick(device)

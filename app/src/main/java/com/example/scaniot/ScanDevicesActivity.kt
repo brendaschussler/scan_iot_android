@@ -2,28 +2,39 @@ package com.example.scaniot
 
 import android.app.AlertDialog
 import android.content.Intent
+import android.net.Uri
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.widget.Button
+import android.widget.ImageView
 import android.widget.Toast
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.result.ActivityResultLauncher
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.example.scaniot.databinding.ActivityScanDevicesBinding
+import com.example.scaniot.helper.Permissions
 import com.example.scaniot.model.Device
 import com.example.scaniot.model.ScanDevicesAdapter
 import com.google.android.material.textfield.TextInputEditText
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.storage.FirebaseStorage
+import java.util.UUID
 
 class ScanDevicesActivity : AppCompatActivity() {
 
     private lateinit var scanDevicesAdapter: ScanDevicesAdapter
     private lateinit var binding: ActivityScanDevicesBinding
+
+    private lateinit var openGalleryLauncher: ActivityResultLauncher<String>
+    private var uriSelectedImage: Uri? = null
+
+    private var currentDialogView: View? = null
 
     private val firebaseAuth by lazy {
         FirebaseAuth.getInstance()
@@ -38,6 +49,7 @@ class ScanDevicesActivity : AppCompatActivity() {
     }
 
     val currentUserId = firebaseAuth.currentUser?.uid ?: ""
+
     val fakeDevices = listOf(
         Device(
             ip = "192.168.1.101",
@@ -105,6 +117,11 @@ class ScanDevicesActivity : AppCompatActivity() {
         )
     )
 
+    private val valPermissions = listOf(
+        android.Manifest.permission.CAMERA,
+        android.Manifest.permission.READ_EXTERNAL_STORAGE,
+        android.Manifest.permission.READ_MEDIA_IMAGES
+    )
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -113,9 +130,23 @@ class ScanDevicesActivity : AppCompatActivity() {
         binding = ActivityScanDevicesBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
+        Permissions.myRequestPermissions(
+            this, valPermissions
+        )
+
         initializeToolbar()
         setupRecyclerView()
         startScanningDevices()
+
+
+        openGalleryLauncher = registerForActivityResult(ActivityResultContracts.GetContent()) { uri ->
+            if (uri != null) {
+                currentDialogView?.findViewById<ImageView>(R.id.selectedImageDevice)?.setImageURI(uri)
+                uriSelectedImage = uri
+            } else {
+                Toast.makeText(this, "No image selected", Toast.LENGTH_LONG).show()
+            }
+        }
 
         ViewCompat.setOnApplyWindowInsetsListener(findViewById(R.id.main)) { v, insets ->
             val systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
@@ -175,14 +206,20 @@ class ScanDevicesActivity : AppCompatActivity() {
 
     private fun showEditDialog(device: Device) {
         val dialogView = LayoutInflater.from(this).inflate(R.layout.dialog_edit_device, null)
+        currentDialogView = dialogView
 
         dialogView.apply {
             findViewById<TextInputEditText>(R.id.editName).setText(device.name)
             findViewById<TextInputEditText>(R.id.editDescription).setText(device.description)
 
             // Esconde o botão de foto por enquanto
-            findViewById<Button>(R.id.button).visibility = View.GONE
+            //findViewById<Button>(R.id.button).visibility = View.GONE
         }
+
+        dialogView.findViewById<Button>(R.id.btnLoadImageGallery).setOnClickListener {
+            openGalleryLauncher.launch("image/*")
+        }
+
 
         AlertDialog.Builder(this)
             .setView(dialogView)
@@ -194,10 +231,56 @@ class ScanDevicesActivity : AppCompatActivity() {
                 )
                 saveDeviceToUserCollection(editedDevice)
                 loadDevicesWithSavedData()
+                uploadGallery(
+                    dialogView.findViewById<TextInputEditText>(R.id.editName).text.toString(),
+                    device.mac.toString()
+                )
             }
             .setNegativeButton("Cancel", null)
             .create()
             .show()
+    }
+
+
+    private fun uploadGallery(name: String?, mac: String?) {
+
+        val imgName = UUID.randomUUID().toString()
+        val thisMac = mac
+
+        if(uriSelectedImage != null && currentUserId != null) {
+
+            storage
+                .getReference("images")
+                .child(currentUserId)
+                .child(imgName)
+                .putFile(uriSelectedImage!!) //!! for certain not null
+                .addOnSuccessListener { task ->
+                    task.metadata?.reference?.downloadUrl
+                        ?.addOnSuccessListener { urlFirebase ->
+
+                            val dados = mapOf(
+                                "photoUrl" to urlFirebase.toString()
+                            )
+                            updateDeviceData(thisMac, dados)
+                    }
+                }
+                .addOnFailureListener {
+                    Toast.makeText(this, "Error uploading image", Toast.LENGTH_LONG).show()
+                }
+        }
+    }
+
+    private fun updateDeviceData(thisMac: String?, dados: Map<String, String>) {
+
+        val thisMacAdress = thisMac
+        if (thisMacAdress != null){
+            firestore
+                .collection("saved_devices")
+                .document(currentUserId)
+                .collection("devices")
+                .document(thisMacAdress)
+                .update(dados)
+        }
     }
 
     private fun saveDeviceToUserCollection(device: Device) {
