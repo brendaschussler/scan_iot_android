@@ -265,7 +265,7 @@ class ScanDevicesActivity : AppCompatActivity() {
                 saveDeviceToUserCollection(editedDevice)
                 loadDevicesWithSavedData()
                 uploadGallery(
-                    dialogView.findViewById<TextInputEditText>(R.id.editName).text.toString(),
+                    //dialogView.findViewById<TextInputEditText>(R.id.editName).text.toString(),
                     device
                 )
             }
@@ -277,7 +277,7 @@ class ScanDevicesActivity : AppCompatActivity() {
 
 
 
-    private fun uploadGallery(name: String?, device: Device) {
+    private fun uploadGallery(device: Device) {
 
         val imgName = UUID.randomUUID().toString()
         val thisMac = device.mac
@@ -303,8 +303,10 @@ class ScanDevicesActivity : AppCompatActivity() {
                                 "photoUrl" to urlFirebase.toString()
                             )
                             val updatedDeviceGlr = device.copy(photoUrl = urlFirebase.toString())
-                            scanDevicesAdapter.updateDevice(updatedDeviceGlr)
+
                             updateDeviceData(thisMac, dados)
+                            //scanDevicesAdapter.updateDevice(updatedDeviceGlr)
+                            loadDevicesWithSavedData()
                     }
                 }
                 .addOnFailureListener {
@@ -324,14 +326,18 @@ class ScanDevicesActivity : AppCompatActivity() {
                                 "photoUrl" to urlFirebase.toString()
                             )
                             val updatedDeviceCam = device.copy(photoUrl = urlFirebase.toString())
-                            scanDevicesAdapter.updateDevice(updatedDeviceCam)
+
                             updateDeviceData(thisMac, dados)
+                            //scanDevicesAdapter.updateDevice(updatedDeviceCam)
+                            loadDevicesWithSavedData()
 
                         }
                 }
                 .addOnFailureListener {
                     Toast.makeText(this, "Error uploading image", Toast.LENGTH_LONG).show()
                 }
+
+
 
         }
     }
