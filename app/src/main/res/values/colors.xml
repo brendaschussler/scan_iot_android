@@ -5,11 +5,11 @@
 
     <color name="primary">#6D2E46</color>
     <color name="primaryVariant">#45152B</color>
-    <color name="OnPrimary">#ECE2D0</color> //write
+    <color name="OnPrimary">#ECE2D0</color>
 
     <color name="primary_night_theme">#ECE2D0</color>
     <color name="primaryVariant_night_theme">#766262</color>
-    <color name="OnPrimary_night_theme">#45152B</color> //write
+    <color name="OnPrimary_night_theme">#45152B</color>
 
     <color name="statusBarColor">#45152B</color>
 

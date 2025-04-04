@@ -41,11 +41,28 @@ android {
 
 dependencies {
 
+    implementation("androidx.lifecycle:lifecycle-viewmodel-ktx:2.6.2")
+    implementation("androidx.lifecycle:lifecycle-livedata-ktx:2.6.2")
+    implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.6.2")
+    implementation("androidx.activity:activity-ktx:1.8.0")
+
+    implementation("androidx.recyclerview:recyclerview:1.3.2")
+
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")
+
+
+    implementation("androidx.recyclerview:recyclerview:1.3.2")
+
     implementation(platform("com.google.firebase:firebase-bom:33.11.0"))
     implementation("com.google.firebase:firebase-analytics")
     implementation("com.google.firebase:firebase-auth")
     implementation("com.google.firebase:firebase-firestore")
     implementation("com.google.firebase:firebase-storage")
+    implementation("com.squareup.picasso:picasso:2.8")
+
+
+    implementation("com.github.bumptech.glide:glide:4.16.0")
+    /*kapt ("com.github.bumptech.glide:compiler:4.16.0")*/
 
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.appcompat)
