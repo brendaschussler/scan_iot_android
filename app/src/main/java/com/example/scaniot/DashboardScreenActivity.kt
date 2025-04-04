@@ -13,6 +13,7 @@ import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import com.example.scaniot.databinding.ActivityDashboardScreenBinding
 import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.firestore.FirebaseFirestore
 
 class DashboardScreenActivity : AppCompatActivity() {
 
@@ -24,6 +25,10 @@ class DashboardScreenActivity : AppCompatActivity() {
         FirebaseAuth.getInstance()
     }
 
+    private val firestore by lazy {
+        FirebaseFirestore.getInstance()
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
@@ -31,12 +36,29 @@ class DashboardScreenActivity : AppCompatActivity() {
 
         initializeToolbar()
         initializeClickEvents()
+        fetchUserNameFromFirestore()
 
         ViewCompat.setOnApplyWindowInsetsListener(findViewById(R.id.main)) { v, insets ->
             val systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
             v.setPadding(systemBars.left, systemBars.top, systemBars.right, systemBars.bottom)
             insets
         }
+    }
+
+    private fun fetchUserNameFromFirestore() {
+        val userId = firebaseAuth.currentUser?.uid ?: return
+
+        FirebaseFirestore.getInstance()
+            .collection("users")
+            .document(userId)
+            .get()
+            .addOnSuccessListener { document ->
+                val name = document.getString("name") ?: "User"
+                binding.textNameUser.text = name
+            }
+            .addOnFailureListener {
+                binding.textNameUser.text = "User"
+            }
     }
 
     private fun navigateToScan(){
@@ -62,23 +84,6 @@ class DashboardScreenActivity : AppCompatActivity() {
             logoutUser()
         }
 
-/*        addMenuProvider(
-            object : MenuProvider {
-                override fun onCreateMenu(menu: Menu, menuInflater: MenuInflater) {
-                    menuInflater.inflate(R.menu.menu_main, menu)
-                }
-
-                override fun onMenuItemSelected(menuItem: MenuItem): Boolean {
-                    when(menuItem.itemId){
-                        R.id.logout_item -> {
-                            logoutUser()
-                        }
-                    }
-                    return true
-                }
-
-            }
-        )*/
     }
 
     private fun logoutUser() {

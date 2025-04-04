@@ -21,6 +21,16 @@ class ScanDevicesAdapter(
         notifyDataSetChanged() // Adicionado para atualizar a RecyclerView
     }
 
+    fun updateDevice(updatedDevice: Device) {
+        val position = listScanDevices.indexOfFirst { it.mac == updatedDevice.mac }
+        if (position != -1) {
+            val newList = listScanDevices.toMutableList()
+            newList[position] = updatedDevice
+            listScanDevices = newList
+            notifyItemChanged(position)
+        }
+    }
+
     inner class ScanDeviceViewHolder(
         private val binding: ItemDeviceBinding
     ) : RecyclerView.ViewHolder(binding.root) {

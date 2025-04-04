@@ -21,6 +21,8 @@
             android:layout_width="71dp"
             android:layout_height="97dp"
             android:padding="3dp"
+            android:paddingEnd="8dp"
+            android:paddingRight="8dp"
             android:src="@drawable/ic_device_unknown"
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintTop_toTopOf="parent" />

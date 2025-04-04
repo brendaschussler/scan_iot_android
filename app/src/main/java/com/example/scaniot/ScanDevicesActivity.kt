@@ -2,8 +2,11 @@ package com.example.scaniot
 
 import android.app.AlertDialog
 import android.content.Intent
+import android.graphics.Bitmap
 import android.net.Uri
+import android.os.Build
 import android.os.Bundle
+import android.provider.MediaStore
 import android.view.LayoutInflater
 import android.view.View
 import android.widget.Button
@@ -24,6 +27,7 @@ import com.google.android.material.textfield.TextInputEditText
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.storage.FirebaseStorage
+import java.io.ByteArrayOutputStream
 import java.util.UUID
 
 class ScanDevicesActivity : AppCompatActivity() {
@@ -32,7 +36,10 @@ class ScanDevicesActivity : AppCompatActivity() {
     private lateinit var binding: ActivityScanDevicesBinding
 
     private lateinit var openGalleryLauncher: ActivityResultLauncher<String>
+    private lateinit var openCameraLauncher: ActivityResultLauncher<Intent>
+
     private var uriSelectedImage: Uri? = null
+    private var bitmapSelectedImage: Bitmap? = null
 
     private var currentDialogView: View? = null
 
@@ -138,13 +145,29 @@ class ScanDevicesActivity : AppCompatActivity() {
         setupRecyclerView()
         startScanningDevices()
 
-
         openGalleryLauncher = registerForActivityResult(ActivityResultContracts.GetContent()) { uri ->
             if (uri != null) {
                 currentDialogView?.findViewById<ImageView>(R.id.selectedImageDevice)?.setImageURI(uri)
                 uriSelectedImage = uri
             } else {
                 Toast.makeText(this, "No image selected", Toast.LENGTH_LONG).show()
+            }
+        }
+
+        openCameraLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+            if (result.resultCode == RESULT_OK) {
+                val bitmap = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                    result.data?.extras?.getParcelable("data", Bitmap::class.java)
+                } else {
+                    @Suppress("DEPRECATION")
+                    result.data?.extras?.getParcelable("data")
+                }
+
+                bitmap?.let {
+                    bitmapSelectedImage = it
+                    uriSelectedImage = null // Limpa a URI se houver
+                    currentDialogView?.findViewById<ImageView>(R.id.selectedImageDevice)?.setImageBitmap(it)
+                }
             }
         }
 
@@ -220,6 +243,16 @@ class ScanDevicesActivity : AppCompatActivity() {
             openGalleryLauncher.launch("image/*")
         }
 
+        // Configuração do botão da câmera
+        dialogView.findViewById<Button>(R.id.btnOpenCamera).setOnClickListener {
+            val cameraIntent = Intent(MediaStore.ACTION_IMAGE_CAPTURE)
+            if (cameraIntent.resolveActivity(packageManager) != null) {
+                openCameraLauncher.launch(cameraIntent)
+            } else {
+                Toast.makeText(this, "No camera app found", Toast.LENGTH_SHORT).show()
+            }
+        }
+
 
         AlertDialog.Builder(this)
             .setView(dialogView)
@@ -233,7 +266,7 @@ class ScanDevicesActivity : AppCompatActivity() {
                 loadDevicesWithSavedData()
                 uploadGallery(
                     dialogView.findViewById<TextInputEditText>(R.id.editName).text.toString(),
-                    device.mac.toString()
+                    device
                 )
             }
             .setNegativeButton("Cancel", null)
@@ -242,13 +275,21 @@ class ScanDevicesActivity : AppCompatActivity() {
     }
 
 
-    private fun uploadGallery(name: String?, mac: String?) {
+
+
+    private fun uploadGallery(name: String?, device: Device) {
 
         val imgName = UUID.randomUUID().toString()
-        val thisMac = mac
+        val thisMac = device.mac
+
+        val outputStream = ByteArrayOutputStream()
+        bitmapSelectedImage?.compress(
+            Bitmap.CompressFormat.JPEG,
+            70,
+            outputStream
+        )
 
         if(uriSelectedImage != null && currentUserId != null) {
-
             storage
                 .getReference("images")
                 .child(currentUserId)
@@ -261,12 +302,37 @@ class ScanDevicesActivity : AppCompatActivity() {
                             val dados = mapOf(
                                 "photoUrl" to urlFirebase.toString()
                             )
+                            val updatedDeviceGlr = device.copy(photoUrl = urlFirebase.toString())
+                            scanDevicesAdapter.updateDevice(updatedDeviceGlr)
                             updateDeviceData(thisMac, dados)
                     }
                 }
                 .addOnFailureListener {
                     Toast.makeText(this, "Error uploading image", Toast.LENGTH_LONG).show()
                 }
+        } else if(bitmapSelectedImage != null){
+            storage
+                .getReference("images")
+                .child(currentUserId)
+                .child(imgName)
+                .putBytes( outputStream.toByteArray() )
+                .addOnSuccessListener { task ->
+                    task.metadata?.reference?.downloadUrl
+                        ?.addOnSuccessListener { urlFirebase ->
+
+                            val dados = mapOf(
+                                "photoUrl" to urlFirebase.toString()
+                            )
+                            val updatedDeviceCam = device.copy(photoUrl = urlFirebase.toString())
+                            scanDevicesAdapter.updateDevice(updatedDeviceCam)
+                            updateDeviceData(thisMac, dados)
+
+                        }
+                }
+                .addOnFailureListener {
+                    Toast.makeText(this, "Error uploading image", Toast.LENGTH_LONG).show()
+                }
+
         }
     }
 
