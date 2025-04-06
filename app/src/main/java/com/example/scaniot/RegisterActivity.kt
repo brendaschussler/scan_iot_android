@@ -1,7 +1,10 @@
 package com.example.scaniot
 
+import android.app.Activity
+import android.app.AlertDialog
 import android.content.Intent
 import android.os.Bundle
+import android.util.Log
 import androidx.activity.enableEdgeToEdge
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.ViewCompat
@@ -25,6 +28,7 @@ class RegisterActivity : AppCompatActivity() {
     private lateinit var name: String
     private lateinit var email: String
     private lateinit var password: String
+    private lateinit var confirmPassword: String
 
     private val firebaseAuth by lazy {
         FirebaseAuth.getInstance()
@@ -55,10 +59,8 @@ class RegisterActivity : AppCompatActivity() {
 
         binding.btnSignUp.setOnClickListener {
             if ( validateFields() ){
-                registerUser(name, email, password)
-                
+                    registerUser(name, email, password)
             }
-
         }
     }
 
@@ -67,6 +69,8 @@ class RegisterActivity : AppCompatActivity() {
             email, password
         ).addOnCompleteListener { result ->
             if (result.isSuccessful){
+
+                sendVerificationEmail()
 
                 //save data on Firestore
                 val userId = result.result.user?.uid
@@ -77,11 +81,9 @@ class RegisterActivity : AppCompatActivity() {
                     saveUserFirestore(user)
                 }
 
-                startActivity(
-                    // if register is successful firebase already authenticates the user
-                    // don't need to do login
-                    Intent(applicationContext, DashboardScreenActivity::class.java)
-                )
+                // back to login screen
+                finish()
+
             }
         }.addOnFailureListener { myError ->
             try {
@@ -99,13 +101,25 @@ class RegisterActivity : AppCompatActivity() {
         }
     }
 
+    private fun sendVerificationEmail() {
+        val user = firebaseAuth.currentUser
+        user?.sendEmailVerification()
+            ?.addOnCompleteListener { task ->
+                if (task.isSuccessful) {
+                    Log.d("EmailVerification", "email sent")
+                } else {
+                    Log.e("EmailVerification", "failed to send email", task.exception)
+                }
+            }
+    }
+
     private fun saveUserFirestore(user: User) {
         firestore
             .collection("users")
             .document(user.userId)
             .set(user)
             .addOnSuccessListener {
-                showMessage("Your account has been successfully created.")
+                //showMessage("Your account has been successfully created.")
             }.addOnFailureListener {
                 showMessage("Registration error.")
             }
@@ -116,6 +130,7 @@ class RegisterActivity : AppCompatActivity() {
         name = binding.editName.text.toString()
         email = binding.editEmail.text.toString()
         password = binding.editPassword.text.toString()
+        confirmPassword = binding.editConfirmPassword.text.toString()
 
         if (name.isNotEmpty()) {
             binding.textInputLayoutName.error = null
@@ -125,7 +140,15 @@ class RegisterActivity : AppCompatActivity() {
 
                 if (password.isNotEmpty()) {
                     binding.textInputLayoutPassword.error = null
-                    return true
+
+                    if (password == confirmPassword) {
+                        binding.textInputLayoutConfirmPassword.error = null
+                        return true
+                    }
+                    else{
+                        binding.textInputLayoutConfirmPassword.error = "Password and confirm password does not match"
+                        return false
+                    }
                 }else{
                     binding.textInputLayoutPassword.error = "Enter your password"
                     return false

@@ -1,8 +1,10 @@
 package com.example.scaniot
 
 import android.app.Activity
+import android.app.AlertDialog
 import android.content.Intent
 import android.os.Bundle
+import android.util.Log
 import androidx.activity.enableEdgeToEdge
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.ViewCompat
@@ -30,10 +32,8 @@ class LoginActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
 
-        //MY CODES
         setContentView( binding.root )
         initializeClickEvents()
-        //firebaseAuth.signOut()
 
         ViewCompat.setOnApplyWindowInsetsListener(findViewById(R.id.main)) { v, insets ->
             val systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
@@ -49,11 +49,53 @@ class LoginActivity : AppCompatActivity() {
 
     private fun verifyUserIsLoggedIn() {
         val myCurrentUser = firebaseAuth.currentUser
-        if (myCurrentUser != null ){
-            startActivity(
-                Intent(this, DashboardScreenActivity::class.java )
-            )
+        if(myCurrentUser!=null) {
+            if (myCurrentUser.isEmailVerified) {
+                startActivity(Intent(this, DashboardScreenActivity::class.java))
+            } else {
+                showEmailRequiredAlert()
+            }
         }
+    }
+
+    private fun showEmailRequiredAlert() {
+        AlertDialog.Builder(this)
+            .setTitle("Please verify your email")
+            .setMessage("We sent you an email to ${firebaseAuth.currentUser?.email} " +
+                    "to verify your email adress and activate your account.")
+            .setPositiveButton("Resend Verification Email") { _, _ ->
+                sendVerificationEmail()
+            }
+            .setNegativeButton("Login") { _, _ ->
+                FirebaseAuth.getInstance().signOut()
+            }
+            .show()
+    }
+
+    private fun showVerificationAlert() {
+        AlertDialog.Builder(this)
+            .setTitle("Verify your email adress")
+            .setMessage("We sent you an email to ${firebaseAuth.currentUser?.email}. " +
+                    "Click on the link in that email to verify your account.")
+            .setPositiveButton("Resend Verfication Email") { _, _ ->
+                sendVerificationEmail()
+            }
+            .setNegativeButton("Login") { _, _ ->
+                FirebaseAuth.getInstance().signOut()
+            }
+            .show()
+    }
+
+    private fun sendVerificationEmail() {
+        val user = firebaseAuth.currentUser
+        user?.sendEmailVerification()
+            ?.addOnCompleteListener { task ->
+                if (task.isSuccessful) {
+                    Log.d("EmailVerification", "email sent")
+                } else {
+                    Log.e("EmailVerification", "failed to send email", task.exception)
+                }
+            }
     }
 
     private fun initializeClickEvents() {
@@ -73,9 +115,14 @@ class LoginActivity : AppCompatActivity() {
         firebaseAuth.signInWithEmailAndPassword(
             email, password
         ).addOnSuccessListener {
-            startActivity(
-                Intent(this, DashboardScreenActivity::class.java )
-            )
+            if (firebaseAuth.currentUser?.isEmailVerified == true) {
+                // Login bem-sucedido
+                startActivity(Intent(this, DashboardScreenActivity::class.java))
+            } else {
+                // Mostra alerta
+                showVerificationAlert()
+                FirebaseAuth.getInstance().signOut() // Força logout
+            }
         }.addOnFailureListener { myError ->
             try {
                 throw myError
