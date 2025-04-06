@@ -5,6 +5,8 @@ import android.app.AlertDialog
 import android.content.Intent
 import android.os.Bundle
 import android.util.Log
+import android.view.LayoutInflater
+import android.widget.EditText
 import androidx.activity.enableEdgeToEdge
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.ViewCompat
@@ -63,10 +65,7 @@ class LoginActivity : AppCompatActivity() {
             .setTitle("Please verify your email")
             .setMessage("We sent you an email to ${firebaseAuth.currentUser?.email} " +
                     "to verify your email adress and activate your account.")
-            .setPositiveButton("Resend Verification Email") { _, _ ->
-                sendVerificationEmail()
-            }
-            .setNegativeButton("Login") { _, _ ->
+            .setPositiveButton("Close") { _, _ ->
                 FirebaseAuth.getInstance().signOut()
             }
             .show()
@@ -80,7 +79,7 @@ class LoginActivity : AppCompatActivity() {
             .setPositiveButton("Resend Verfication Email") { _, _ ->
                 sendVerificationEmail()
             }
-            .setNegativeButton("Login") { _, _ ->
+            .setNegativeButton("Close") { _, _ ->
                 FirebaseAuth.getInstance().signOut()
             }
             .show()
@@ -109,6 +108,43 @@ class LoginActivity : AppCompatActivity() {
                 loginUser()
             }
         }
+        binding.txtForgotPassword.setOnClickListener {
+            showForgotPasswordDialog()
+        }
+    }
+
+    private fun showForgotPasswordDialog() {
+        val dialogView = LayoutInflater.from(this).inflate(R.layout.dialog_forgot_password, null)
+        val editEmail = dialogView.findViewById<EditText>(R.id.editEmailForgotPassword)
+
+        AlertDialog.Builder(this)
+            .setTitle("Reset Password")
+            .setView(dialogView)
+            .setPositiveButton("Send Link") { _, _ ->
+                val email = editEmail.text.toString().trim()
+                if (email.isNotEmpty()) {
+                    sendPasswordResetEmail(email)
+                } else {
+                    showMessage("Please enter your email")
+                }
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
+    }
+
+    private fun sendPasswordResetEmail(email: String) {
+        firebaseAuth.sendPasswordResetEmail(email)
+            .addOnCompleteListener { task ->
+                if (task.isSuccessful) {
+                    showMessage("Password reset link sent to $email")
+                } else {
+                    showMessage("Failed: ${task.exception?.message}")
+                }
+            }.addOnFailureListener { e ->
+                if (e is FirebaseAuthInvalidUserException) {
+                    showMessage("Email not registered")
+                }
+            }
     }
 
     private fun loginUser() {
