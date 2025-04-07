@@ -6,6 +6,8 @@ data class Device(
     var name: String = "unknown",
     var description: String = "unknown",
     val manufacturer: String = "unknown",
+    val deviceModel: String = "unknown",
+    val deviceLocation: String = "unknown",
     var photoUrl: String? = null,
     val userId: String = ""
 )

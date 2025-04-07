@@ -42,6 +42,8 @@ class ScanDevicesAdapter(
                 txtMacAdress.text = device.mac
                 txtIpAdress.text = device.ip
                 txtManufacturer.text = device.manufacturer
+                txtModel.text = device.deviceModel
+                txtLocation.text = device.deviceLocation
 
                 // Carrega a imagem do dispositivo se existir
                 if (device.photoUrl != null) {

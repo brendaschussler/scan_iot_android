@@ -18,8 +18,8 @@
         <!-- Imagem do dispositivo -->
         <ImageView
             android:id="@+id/imgDevice"
-            android:layout_width="71dp"
-            android:layout_height="97dp"
+            android:layout_width="70dp"
+            android:layout_height="135dp"
             android:padding="3dp"
             android:paddingEnd="8dp"
             android:paddingRight="8dp"
@@ -120,8 +120,7 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="Manufacturer:"
-            app:layout_constraintBottom_toBottomOf="@+id/imgDevice"
-            app:layout_constraintStart_toStartOf="@+id/textView9"
+            app:layout_constraintStart_toEndOf="@+id/imgDevice"
             app:layout_constraintTop_toBottomOf="@+id/textView9" />
 
         <TextView
@@ -131,11 +130,44 @@
             android:layout_marginStart="2dp"
             android:maxLength="15"
             android:text="Manufacturer"
-            app:layout_constraintBottom_toBottomOf="@+id/imgDevice"
-            app:layout_constraintEnd_toStartOf="@+id/btnSaveDevice"
-            app:layout_constraintHorizontal_bias="0.0"
             app:layout_constraintStart_toEndOf="@+id/textView11"
             app:layout_constraintTop_toBottomOf="@+id/txtMacAdress" />
+
+        <TextView
+            android:id="@+id/textView12"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Model:"
+            app:layout_constraintStart_toEndOf="@+id/imgDevice"
+            app:layout_constraintTop_toBottomOf="@+id/textView11" />
+
+        <TextView
+            android:id="@+id/txtModel"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="2dp"
+            android:text="Model"
+            app:layout_constraintStart_toEndOf="@+id/textView12"
+            app:layout_constraintTop_toBottomOf="@+id/txtManufacturer" />
+
+        <TextView
+            android:id="@+id/textView14"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Location:"
+            app:layout_constraintBottom_toBottomOf="@+id/imgDevice"
+            app:layout_constraintStart_toEndOf="@+id/imgDevice"
+            app:layout_constraintTop_toBottomOf="@+id/textView12" />
+
+        <TextView
+            android:id="@+id/txtLocation"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="2dp"
+            android:text="Location"
+            app:layout_constraintBottom_toBottomOf="@+id/imgDevice"
+            app:layout_constraintStart_toEndOf="@+id/textView14"
+            app:layout_constraintTop_toBottomOf="@+id/txtModel" />
 
     </androidx.constraintlayout.widget.ConstraintLayout>
 </androidx.cardview.widget.CardView>
