@@ -21,6 +21,10 @@
         android:theme="@style/Theme.ScanIoT"
         tools:targetApi="31">
         <activity
+            android:name=".SavedDevicesActivity"
+            android:exported="false"
+            android:parentActivityName=".DashboardScreenActivity" />
+        <activity
             android:name=".ScanDevicesActivity"
             android:exported="false"
             android:parentActivityName=".DashboardScreenActivity" />

@@ -69,8 +69,17 @@ class DashboardScreenActivity : AppCompatActivity() {
         }
     }
 
+    private fun navigateToSavedDevices(){
+        binding.btnSavedDevices.setOnClickListener {
+            startActivity(
+                Intent(this, SavedDevicesActivity::class.java)
+            )
+        }
+    }
+
     private fun initializeClickEvents() {
         navigateToScan()
+        navigateToSavedDevices()
     }
 
     private fun initializeToolbar() {
