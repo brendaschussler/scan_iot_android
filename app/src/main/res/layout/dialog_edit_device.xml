@@ -59,10 +59,10 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginBottom="8dp"
-            android:hint="Device manufacturer">
+            android:hint="Device vendor">
 
             <com.google.android.material.textfield.TextInputEditText
-                android:id="@+id/editManufacturer"
+                android:id="@+id/editVendor"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:textSize="20sp" />

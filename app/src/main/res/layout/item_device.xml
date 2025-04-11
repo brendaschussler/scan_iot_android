@@ -119,17 +119,17 @@
             android:id="@+id/textView11"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="Manufacturer:"
+            android:text="Vendor:"
             app:layout_constraintStart_toEndOf="@+id/imgDevice"
             app:layout_constraintTop_toBottomOf="@+id/textView9" />
 
         <TextView
-            android:id="@+id/txtManufacturer"
+            android:id="@+id/txtVendor"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginStart="2dp"
             android:maxLength="15"
-            android:text="Manufacturer"
+            android:text="Vendor"
             app:layout_constraintStart_toEndOf="@+id/textView11"
             app:layout_constraintTop_toBottomOf="@+id/txtMacAdress" />
 
@@ -148,7 +148,7 @@
             android:layout_marginStart="2dp"
             android:text="Model"
             app:layout_constraintStart_toEndOf="@+id/textView12"
-            app:layout_constraintTop_toBottomOf="@+id/txtManufacturer" />
+            app:layout_constraintTop_toBottomOf="@+id/txtVendor" />
 
         <TextView
             android:id="@+id/textView14"

@@ -3,8 +3,6 @@ package com.example.scaniot.model
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
-import androidx.recyclerview.widget.RecyclerView.Adapter
-import androidx.recyclerview.widget.RecyclerView.ViewHolder
 import com.example.scaniot.databinding.ItemDeviceBinding
 import androidx.recyclerview.widget.RecyclerView
 import com.bumptech.glide.Glide
@@ -31,7 +29,7 @@ class ScanDevicesAdapter(
                 txtDescription.text = device.description
                 txtMacAdress.text = device.mac
                 txtIpAdress.text = device.ip
-                txtManufacturer.text = device.manufacturer
+                txtVendor.text = device.vendor
                 txtModel.text = device.deviceModel
                 txtLocation.text = device.deviceLocation
 

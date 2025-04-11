@@ -35,7 +35,7 @@ class SavedDevicesAdapter(
                 txtDescriptionSaved.text = device.description
                 txtMacAdressSaved.text = device.mac
                 txtIpAdressSaved.text = device.ip
-                txtManufacturerSaved.text = device.manufacturer
+                txtVendorSaved.text = device.vendor
                 txtModelSaved.text = device.deviceModel ?: "Unknown"
                 txtLocationSaved.text = device.deviceLocation ?: "Not specified"
 

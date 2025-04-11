@@ -63,7 +63,7 @@ class ScanDevicesActivity : AppCompatActivity() {
             mac = "00:1A:2B:3C:4D:5E",
             name = "Smart TV",
             description = "Samsung 4K UHD",
-            manufacturer = "Samsung",
+            vendor = "Samsung",
             deviceModel = "4k UHD",
             deviceLocation = "Home",
             userId = currentUserId
@@ -73,7 +73,7 @@ class ScanDevicesActivity : AppCompatActivity() {
             mac = "00:1B:2C:3D:4E:5F",
             name = "Smartphone",
             description = "Android Phone",
-            manufacturer = "Xiaomi",
+            vendor = "Xiaomi",
             deviceModel = "Redmi Note 10",
             deviceLocation = "Home",
             userId = currentUserId
@@ -83,7 +83,7 @@ class ScanDevicesActivity : AppCompatActivity() {
             mac = "00:1C:2D:3E:4F:5A",
             name = "Notebook",
             description = "Work laptop",
-            manufacturer = "Apple",
+            vendor = "Apple",
             deviceModel = "Macbook Air",
             deviceLocation = "Work",
             userId = currentUserId
@@ -93,7 +93,7 @@ class ScanDevicesActivity : AppCompatActivity() {
             mac = "00:1D:2E:3F:4A:5B",
             name = "Smart Light",
             description = "RGB Bulb",
-            manufacturer = "Philips",
+            vendor = "Philips",
             deviceModel = "Macbook Air",
             deviceLocation = "Work",
             userId = currentUserId
@@ -103,7 +103,7 @@ class ScanDevicesActivity : AppCompatActivity() {
             mac = "00:1E:2F:3A:4B:5C",
             name = "Security Camera",
             description = "Outdoor camera",
-            manufacturer = "TP-Link",
+            vendor = "TP-Link",
             deviceModel = "Macbook Air",
             deviceLocation = "Work",
             userId = currentUserId
@@ -113,7 +113,7 @@ class ScanDevicesActivity : AppCompatActivity() {
             mac = "00:1E:2F:3A:4B:5C",
             name = "Security Camera",
             description = "Outdoor camera",
-            manufacturer = "TP-Link",
+            vendor = "TP-Link",
             deviceModel = "Macbook Air",
             deviceLocation = "Work",
             userId = currentUserId
@@ -123,7 +123,7 @@ class ScanDevicesActivity : AppCompatActivity() {
             mac = "00:1E:2F:3A:4B:5C",
             name = "Security Camera",
             description = "Outdoor camera",
-            manufacturer = "TP-Link",
+            vendor = "TP-Link",
             deviceModel = "Macbook Air",
             deviceLocation = "Work",
             userId = currentUserId
@@ -133,7 +133,7 @@ class ScanDevicesActivity : AppCompatActivity() {
             mac = "00:1E:2F:3A:4B:5C",
             name = "Security Camera",
             description = "Outdoor camera",
-            manufacturer = "TP-Link",
+            vendor = "TP-Link",
             deviceModel = "Macbook Air",
             deviceLocation = "Work",
             userId = currentUserId
@@ -250,7 +250,7 @@ class ScanDevicesActivity : AppCompatActivity() {
         dialogView.apply {
             findViewById<TextInputEditText>(R.id.editName).setText(device.name)
             findViewById<TextInputEditText>(R.id.editDescription).setText(device.description)
-            findViewById<TextInputEditText>(R.id.editManufacturer).setText(device.manufacturer)
+            findViewById<TextInputEditText>(R.id.editVendor).setText(device.vendor)
             findViewById<TextInputEditText>(R.id.editModel).setText(device.deviceModel)
             findViewById<TextInputEditText>(R.id.editLocation).setText(device.deviceLocation)
 
@@ -280,7 +280,7 @@ class ScanDevicesActivity : AppCompatActivity() {
                 val editedDevice = device.copy(
                     name = dialogView.findViewById<TextInputEditText>(R.id.editName).text.toString(),
                     description = dialogView.findViewById<TextInputEditText>(R.id.editDescription).text.toString(),
-                    manufacturer = dialogView.findViewById<TextInputEditText>(R.id.editManufacturer).text.toString(),
+                    vendor = dialogView.findViewById<TextInputEditText>(R.id.editVendor).text.toString(),
                     deviceModel = dialogView.findViewById<TextInputEditText>(R.id.editModel).text.toString(),
                     deviceLocation = dialogView.findViewById<TextInputEditText>(R.id.editLocation).text.toString()
                 )
