@@ -5,9 +5,9 @@ data class Device(
     val mac: String = "",  // Usado as ID in Firestore
     var name: String = "unknown",
     var description: String = "unknown",
-    val manufacturer: String = "unknown",
-    val deviceModel: String = "unknown",
-    val deviceLocation: String = "unknown",
+    var manufacturer: String = "unknown",
+    var deviceModel: String = "unknown",
+    var deviceLocation: String = "unknown",
     var photoUrl: String? = null,
     val userId: String = ""
 )
