@@ -4,13 +4,14 @@ import android.app.AlertDialog
 import android.content.Intent
 import android.os.Bundle
 import android.view.LayoutInflater
+import android.view.View
 import androidx.activity.enableEdgeToEdge
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.example.scaniot.databinding.ActivitySavedDevicesBinding
-import com.example.scaniot.databinding.ActivityScanDevicesBinding
+import com.example.scaniot.model.CaptureRepository
 import com.example.scaniot.model.Device
 import com.example.scaniot.model.SavedDevicesAdapter
 import com.example.scaniot.utils.showMessage
@@ -95,9 +96,38 @@ class SavedDevicesActivity : AppCompatActivity() {
                 }
 
                 //startPacketCapture(packetCount, filename)
+                val selectedDevices = savedDevicesAdapter.getSelectedDevices()
+                startCapturedPacketsActivity(selectedDevices, packetCount, filename)
             }
             .setNegativeButton("Cancel", null)
             .show()
+    }
+
+    private fun startCapturedPacketsActivity(devices: List<Device>, packetCount: Int, filename: String) {
+        // Atualiza os dispositivos com informações de captura
+
+        val devicesWithCapture = devices.map {
+            it.copy(
+                capturing = true,
+                captureTotal = packetCount,
+                captureProgress = 0,
+                lastCaptureTimestamp = System.currentTimeMillis()
+            )
+        }
+
+        // Salva no Firestore
+        CaptureRepository.saveLastCapture(devicesWithCapture) { success ->
+            if (success) {
+                val intent = Intent(this, CapturedPacketsActivity::class.java).apply {
+                    putParcelableArrayListExtra("selected_devices", ArrayList(devicesWithCapture))
+                    putExtra("packet_count", packetCount)
+                    putExtra("filename", filename)
+                }
+                startActivity(intent)
+            } else {
+                showMessage("Failed to save capture session")
+            }
+        }
     }
 
     private fun setupRecyclerView() {
@@ -114,6 +144,9 @@ class SavedDevicesActivity : AppCompatActivity() {
         binding.rvListSavedDevices.apply {
             adapter = savedDevicesAdapter
             layoutManager = LinearLayoutManager(this@SavedDevicesActivity)
+
+            isVerticalScrollBarEnabled = true
+            scrollBarStyle = View.SCROLLBARS_OUTSIDE_OVERLAY
         }
     }
 

@@ -77,9 +77,19 @@ class DashboardScreenActivity : AppCompatActivity() {
         }
     }
 
+    private fun navigateToCapturedPackets() {
+        binding.btnCapturedPackets.setOnClickListener {
+            // Força recarregar do Firestore com estado atualizado
+            val intent = Intent(this, CapturedPacketsActivity::class.java)
+            intent.putExtra("force_refresh", true)  // Flag para atualizar
+            startActivity(intent)
+        }
+    }
+
     private fun initializeClickEvents() {
         navigateToScan()
         navigateToSavedDevices()
+        navigateToCapturedPackets()
     }
 
     private fun initializeToolbar() {
