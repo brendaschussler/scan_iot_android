@@ -297,9 +297,6 @@ class ScanDevicesActivity : AppCompatActivity() {
             .show()
     }
 
-
-
-
     private fun uploadGallery(device: Device) {
 
         val imgName = UUID.randomUUID().toString()

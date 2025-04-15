@@ -4,27 +4,25 @@ import android.app.Activity
 import android.app.AlertDialog
 import android.content.Intent
 import android.os.Bundle
-import android.util.Log
 import android.view.LayoutInflater
 import android.widget.EditText
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.viewModels
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import com.example.scaniot.databinding.ActivityLoginBinding
 import com.example.scaniot.utils.showMessage
+import com.example.scaniot.viewModel.LoginViewModel
 import com.google.firebase.auth.FirebaseAuth
-import com.google.firebase.auth.FirebaseAuthInvalidCredentialsException
-import com.google.firebase.auth.FirebaseAuthInvalidUserException
 
 class LoginActivity : AppCompatActivity() {
 
     private val binding by lazy {
-        ActivityLoginBinding.inflate( layoutInflater )
+        ActivityLoginBinding.inflate(layoutInflater)
     }
 
-    private lateinit var email: String
-    private lateinit var password: String
+    private val viewModel: LoginViewModel by viewModels()
 
     private val firebaseAuth by lazy {
         FirebaseAuth.getInstance()
@@ -34,7 +32,7 @@ class LoginActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
 
-        setContentView( binding.root )
+        setContentView(binding.root)
         initializeClickEvents()
 
         ViewCompat.setOnApplyWindowInsetsListener(findViewById(R.id.main)) { v, insets ->
@@ -46,18 +44,14 @@ class LoginActivity : AppCompatActivity() {
 
     override fun onStart() {
         super.onStart()
-        verifyUserIsLoggedIn()
-    }
-
-    private fun verifyUserIsLoggedIn() {
-        val myCurrentUser = firebaseAuth.currentUser
-        if(myCurrentUser!=null) {
-            if (myCurrentUser.isEmailVerified) {
+        viewModel.verifyUserIsLoggedIn(
+            onVerified = {
                 startActivity(Intent(this, DashboardScreenActivity::class.java))
-            } else {
+            },
+            onNotVerified = {
                 showEmailRequiredAlert()
             }
-        }
+        )
     }
 
     private fun showEmailRequiredAlert() {
@@ -76,25 +70,13 @@ class LoginActivity : AppCompatActivity() {
             .setTitle("Verify your email adress")
             .setMessage("We sent you an email to ${firebaseAuth.currentUser?.email}. " +
                     "Click on the link in that email to verify your account.")
-            .setPositiveButton("Resend Verfication Email") { _, _ ->
-                sendVerificationEmail()
-            }
+            /*.setPositiveButton("Resend Verfication Email") { _, _ ->
+                viewModel.sendVerificationEmail()
+            }*/
             .setNegativeButton("Close") { _, _ ->
                 FirebaseAuth.getInstance().signOut()
             }
             .show()
-    }
-
-    private fun sendVerificationEmail() {
-        val user = firebaseAuth.currentUser
-        user?.sendEmailVerification()
-            ?.addOnCompleteListener { task ->
-                if (task.isSuccessful) {
-                    Log.d("EmailVerification", "email sent")
-                } else {
-                    Log.e("EmailVerification", "failed to send email", task.exception)
-                }
-            }
     }
 
     private fun initializeClickEvents() {
@@ -104,8 +86,27 @@ class LoginActivity : AppCompatActivity() {
             )
         }
         binding.btnLogin.setOnClickListener {
-            if (validateFields()){
-                loginUser()
+            viewModel.email = binding.editLoginEmail.text.toString()
+            viewModel.password = binding.editLoginPassword.text.toString()
+
+            if (validateFields()) {
+                viewModel.loginUser(
+                    onSuccessVerified = {
+                        startActivity(Intent(this, DashboardScreenActivity::class.java))
+                    },
+                    onSuccessNotVerified = {
+                        showVerificationAlert()
+                    },
+                    onInvalidEmail = {
+                        showMessage("Invalid e-mail.")
+                    },
+                    onInvalidCredentials = {
+                        showMessage("Invalid e-mail or password.")
+                    },
+                    onFailure = { e ->
+                        showMessage("Error: ${e.message}")
+                    }
+                )
             }
         }
         binding.txtForgotPassword.setOnClickListener {
@@ -123,7 +124,12 @@ class LoginActivity : AppCompatActivity() {
             .setPositiveButton("Send Link") { _, _ ->
                 val email = editEmail.text.toString().trim()
                 if (email.isNotEmpty()) {
-                    sendPasswordResetEmail(email)
+                    viewModel.sendPasswordResetEmail(
+                        email = email,
+                        onSuccess = { message -> showMessage(message) },
+                        onFailure = { message -> showMessage(message) },
+                        onInvalidUser = { showMessage("Email not registered") }
+                    )
                 } else {
                     showMessage("Please enter your email")
                 }
@@ -132,64 +138,22 @@ class LoginActivity : AppCompatActivity() {
             .show()
     }
 
-    private fun sendPasswordResetEmail(email: String) {
-        firebaseAuth.sendPasswordResetEmail(email)
-            .addOnCompleteListener { task ->
-                if (task.isSuccessful) {
-                    showMessage("Password reset link sent to $email")
-                } else {
-                    showMessage("Failed: ${task.exception?.message}")
-                }
-            }.addOnFailureListener { e ->
-                if (e is FirebaseAuthInvalidUserException) {
-                    showMessage("Email not registered")
-                }
-            }
-    }
-
-    private fun loginUser() {
-        firebaseAuth.signInWithEmailAndPassword(
-            email, password
-        ).addOnSuccessListener {
-            if (firebaseAuth.currentUser?.isEmailVerified == true) {
-
-                startActivity(Intent(this, DashboardScreenActivity::class.java))
-            } else {
-
-                showVerificationAlert()
-                FirebaseAuth.getInstance().signOut()
-            }
-        }.addOnFailureListener { myError ->
-            try {
-                throw myError
-            } catch( invalidUserError: FirebaseAuthInvalidUserException) {
-                invalidUserError.printStackTrace()
-                showMessage("Invalid e-mail.")
-            } catch( invalidCredentialsError: FirebaseAuthInvalidCredentialsException){
-                invalidCredentialsError.printStackTrace()
-                showMessage("Invalid e-mail or password.")
-            }
-        }
-    }
-
     private fun validateFields(): Boolean {
-        email = binding.editLoginEmail.text.toString()
-        password = binding.editLoginPassword.text.toString()
+        viewModel.email = binding.editLoginEmail.text.toString()
+        viewModel.password = binding.editLoginPassword.text.toString()
 
-        if ( email.isNotEmpty() ){
+        if (viewModel.email.isNotEmpty()) {
             binding.textInputLayoutLoginEmail.error = null
-            if ( password.isNotEmpty() ){
+            if (viewModel.password.isNotEmpty()) {
                 binding.textInputLayoutLoginPassword.error = null
                 return true
-            }else{
+            } else {
                 binding.textInputLayoutLoginPassword.error = "Enter your password"
                 return false
             }
-        }else{
+        } else {
             binding.textInputLayoutLoginEmail.error = "Enter your e-mail"
             return false
         }
     }
-
-
 }

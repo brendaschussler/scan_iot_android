@@ -56,7 +56,7 @@
         app:layout_constraintHorizontal_bias="0.5"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toBottomOf="@+id/textView7"
-        tools:listitem="@layout/recycler_view_item_1" />
+        tools:listitem="@layout/item_device" />
 
     <Button
         android:id="@+id/btnStartScan"

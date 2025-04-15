@@ -1,48 +1,29 @@
 package com.example.scaniot
 
 import android.app.Activity
-import android.app.AlertDialog
 import android.content.Intent
 import android.os.Bundle
-import android.util.Log
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.viewModels
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
-import com.example.scaniot.databinding.ActivityLoginBinding
 import com.example.scaniot.databinding.ActivityRegisterBinding
-import com.example.scaniot.model.User
 import com.example.scaniot.utils.showMessage
-import com.google.firebase.auth.FirebaseAuth
-import com.google.firebase.auth.FirebaseAuthInvalidCredentialsException
-import com.google.firebase.auth.FirebaseAuthUserCollisionException
-import com.google.firebase.auth.FirebaseAuthWeakPasswordException
-import com.google.firebase.firestore.FirebaseFirestore
+import com.example.scaniot.viewModel.RegisterViewModel
 
 class RegisterActivity : AppCompatActivity() {
 
     private val binding by lazy {
-        ActivityRegisterBinding.inflate( layoutInflater )
+        ActivityRegisterBinding.inflate(layoutInflater)
     }
 
-    private lateinit var name: String
-    private lateinit var email: String
-    private lateinit var password: String
-    private lateinit var confirmPassword: String
-
-    private val firebaseAuth by lazy {
-        FirebaseAuth.getInstance()
-    }
-    private val firestore by lazy {
-        FirebaseFirestore.getInstance()
-    }
+    private val viewModel: RegisterViewModel by viewModels()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
-
-        //MY CODES
-        setContentView( binding.root )
+        setContentView(binding.root)
         initializeClickEvents()
 
         ViewCompat.setOnApplyWindowInsetsListener(findViewById(R.id.main)) { v, insets ->
@@ -54,114 +35,61 @@ class RegisterActivity : AppCompatActivity() {
 
     private fun initializeClickEvents() {
         binding.textSignIn.setOnClickListener {
-            finish() //return to login activity (parent activity)
+            finish() // return to login activity (parent activity)
         }
 
         binding.btnSignUp.setOnClickListener {
-            if ( validateFields() ){
-                    registerUser(name, email, password)
+            viewModel.name = binding.editName.text.toString()
+            viewModel.email = binding.editEmail.text.toString()
+            viewModel.password = binding.editPassword.text.toString()
+            viewModel.confirmPassword = binding.editConfirmPassword.text.toString()
+
+            if (validateFields()) {
+                registerUser()
             }
         }
     }
 
-    private fun registerUser(name: String, email: String, password: String) {
-        firebaseAuth.createUserWithEmailAndPassword(
-            email, password
-        ).addOnCompleteListener { result ->
-            if (result.isSuccessful){
-
-                sendVerificationEmail()
-
-                //save data on Firestore
-                val userId = result.result.user?.uid
-                if (userId != null){
-                    val user = User(
-                        userId, name, email
-                    )
-                    saveUserFirestore(user)
-                }
-
-                // back to login screen
-                finish()
-
-            }
-        }.addOnFailureListener { myError ->
-            try {
-                throw myError
-            }catch (invalidPasswordError: FirebaseAuthWeakPasswordException ){
-                invalidPasswordError.printStackTrace()
+    private fun registerUser() {
+        viewModel.registerUser(
+            onSuccess = {
+                showMessage("Your account has been successfully created.")
+                finish() // back to login screen
+            },
+            onWeakPassword = {
                 showMessage("Weak password.")
-            }catch (userAlreadyExistsError: FirebaseAuthUserCollisionException ){
-                userAlreadyExistsError.printStackTrace()
+            },
+            onUserCollision = {
                 showMessage("The user already exists.")
-            }catch (invalidCredentialsError: FirebaseAuthInvalidCredentialsException){
-                invalidCredentialsError.printStackTrace()
+            },
+            onInvalidCredentials = {
                 showMessage("Invalid credentials.")
+            },
+            onFailure = { e ->
+                showMessage("Registration error: ${e.message}")
             }
-        }
-    }
-
-    private fun sendVerificationEmail() {
-        val user = firebaseAuth.currentUser
-        user?.sendEmailVerification()
-            ?.addOnCompleteListener { task ->
-                if (task.isSuccessful) {
-                    Log.d("EmailVerification", "email sent")
-                } else {
-                    Log.e("EmailVerification", "failed to send email", task.exception)
-                }
-            }
-    }
-
-    private fun saveUserFirestore(user: User) {
-        firestore
-            .collection("users")
-            .document(user.userId)
-            .set(user)
-            .addOnSuccessListener {
-                //showMessage("Your account has been successfully created.")
-            }.addOnFailureListener {
-                showMessage("Registration error.")
-            }
+        )
     }
 
     private fun validateFields(): Boolean {
+        val (fieldId, errorMessage) = viewModel.getFieldValidationErrors()
 
-        name = binding.editName.text.toString()
-        email = binding.editEmail.text.toString()
-        password = binding.editPassword.text.toString()
-        confirmPassword = binding.editConfirmPassword.text.toString()
-
-        if (name.isNotEmpty()) {
-            binding.textInputLayoutName.error = null
-
-            if (email.isNotEmpty()) {
-                binding.textInputLayoutEmail.error = null
-
-                if (password.isNotEmpty()) {
-                    binding.textInputLayoutPassword.error = null
-
-                    if (password == confirmPassword) {
-                        binding.textInputLayoutConfirmPassword.error = null
-                        return true
-                    }
-                    else{
-                        binding.textInputLayoutConfirmPassword.error = "Password and confirm password does not match"
-                        return false
-                    }
-                }else{
-                    binding.textInputLayoutPassword.error = "Enter your password"
-                    return false
-                }
-            }else{
-                binding.textInputLayoutEmail.error = "Enter your e-mail"
-                return false
+        if (fieldId != 0) {
+            when (fieldId) {
+                R.id.textInputLayoutName -> binding.textInputLayoutName.error = errorMessage
+                R.id.textInputLayoutEmail -> binding.textInputLayoutEmail.error = errorMessage
+                R.id.textInputLayoutPassword -> binding.textInputLayoutPassword.error = errorMessage
+                R.id.textInputLayoutConfirmPassword ->
+                    binding.textInputLayoutConfirmPassword.error = errorMessage
             }
-        }else{
-            binding.textInputLayoutName.error = "Enter your name"
             return false
         }
 
+        // Clear all errors if validation passes
+        binding.textInputLayoutName.error = null
+        binding.textInputLayoutEmail.error = null
+        binding.textInputLayoutPassword.error = null
+        binding.textInputLayoutConfirmPassword.error = null
+        return true
     }
-
 }
