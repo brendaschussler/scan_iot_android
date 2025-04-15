@@ -3,15 +3,12 @@ package com.example.scaniot
 import android.app.AlertDialog
 import android.content.Intent
 import android.os.Bundle
-import android.view.Menu
-import android.view.MenuInflater
-import android.view.MenuItem
 import androidx.activity.enableEdgeToEdge
 import androidx.appcompat.app.AppCompatActivity
-import androidx.core.view.MenuProvider
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import com.example.scaniot.databinding.ActivityDashboardScreenBinding
+import com.example.scaniot.view.LoginActivity
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 
@@ -77,9 +74,19 @@ class DashboardScreenActivity : AppCompatActivity() {
         }
     }
 
+    private fun navigateToCapturedPackets() {
+        binding.btnCapturedPackets.setOnClickListener {
+            // Força recarregar do Firestore com estado atualizado
+            val intent = Intent(this, CapturedPacketsActivity::class.java)
+            intent.putExtra("force_refresh", true)  // Flag para atualizar
+            startActivity(intent)
+        }
+    }
+
     private fun initializeClickEvents() {
         navigateToScan()
         navigateToSavedDevices()
+        navigateToCapturedPackets()
     }
 
     private fun initializeToolbar() {
