@@ -15,7 +15,7 @@ import com.example.scaniot.model.CaptureRepository
 import com.example.scaniot.model.Device
 import com.example.scaniot.model.SavedDevicesAdapter
 import com.example.scaniot.utils.showMessage
-import com.example.scaniot.view.LoginActivity
+import com.example.scaniot.LoginActivity
 import com.google.android.material.textfield.TextInputEditText
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore

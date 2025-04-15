@@ -13,9 +13,9 @@ import androidx.core.view.WindowInsetsCompat
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.example.scaniot.databinding.ActivityCapturedPacketsBinding
 import com.example.scaniot.model.CaptureRepository
+import com.example.scaniot.LoginActivity
 import com.example.scaniot.model.CapturedPacketsAdapter
 import com.example.scaniot.model.Device
-import com.example.scaniot.view.LoginActivity
 import com.google.firebase.auth.FirebaseAuth
 
 class CapturedPacketsActivity : AppCompatActivity() {
