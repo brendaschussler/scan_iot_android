@@ -59,20 +59,10 @@
             android:layout_height="50dp"
             android:background="?attr/selectableItemBackgroundBorderless"
             android:src="@drawable/ic_edit"
-            app:layout_constraintBottom_toTopOf="@+id/btnSaveDevice"
+            app:layout_constraintBottom_toBottomOf="parent"
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintTop_toTopOf="parent"
             app:layout_constraintVertical_chainStyle="packed" />
-
-        <ImageButton
-            android:id="@+id/btnSaveDevice"
-            android:layout_width="50dp"
-            android:layout_height="50dp"
-            android:background="?attr/selectableItemBackgroundBorderless"
-            android:src="@drawable/ic_save"
-            app:layout_constraintBottom_toBottomOf="parent"
-            app:layout_constraintEnd_toEndOf="parent"
-            app:layout_constraintTop_toBottomOf="@+id/btnEditDevice" />
 
         <TextView
             android:id="@+id/txtDescription"
@@ -91,8 +81,6 @@
             android:layout_height="wrap_content"
             android:layout_marginStart="2dp"
             android:text="MAC Adress"
-            app:layout_constraintEnd_toStartOf="@+id/btnSaveDevice"
-            app:layout_constraintHorizontal_bias="0.0"
             app:layout_constraintStart_toEndOf="@+id/textView9"
             app:layout_constraintTop_toBottomOf="@+id/txtIpAdress" />
 
@@ -168,6 +156,15 @@
             app:layout_constraintBottom_toBottomOf="@+id/imgDevice"
             app:layout_constraintStart_toEndOf="@+id/textView14"
             app:layout_constraintTop_toBottomOf="@+id/txtModel" />
+
+        <ImageView
+            android:id="@+id/img_new"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            app:layout_constraintEnd_toEndOf="@+id/btnEditDevice"
+            app:layout_constraintStart_toStartOf="@+id/btnEditDevice"
+            app:layout_constraintTop_toTopOf="parent"
+            app:srcCompat="@drawable/baseline_fiber_new_35" />
 
     </androidx.constraintlayout.widget.ConstraintLayout>
 </androidx.cardview.widget.CardView>

@@ -1,5 +1,6 @@
 package com.example.scaniot.model
 
+import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -9,14 +10,17 @@ import com.bumptech.glide.Glide
 import com.example.scaniot.R
 
 class ScanDevicesAdapter(
-    private val onEditClick: (Device) -> Unit
+    private val onEditClick: (Device) -> Unit,
+    private val savedDevices: List<Device> = emptyList(),
+    private val scannedNotSavedDevices: List<Device> = emptyList()
 ) : RecyclerView.Adapter<ScanDevicesAdapter.ScanDeviceViewHolder>() {
+
 
     private var listScanDevices = emptyList<Device>()
 
     fun addList(myList: List<Device>) {
         listScanDevices = myList
-        notifyDataSetChanged() // Adicionado para atualizar a RecyclerView
+        notifyDataSetChanged()
     }
 
     inner class ScanDeviceViewHolder(
@@ -32,6 +36,13 @@ class ScanDevicesAdapter(
                 txtVendor.text = device.vendor
                 txtModel.text = device.deviceModel
                 txtLocation.text = device.deviceLocation
+                imgNew.visibility = if (device.isNew) View.VISIBLE else View.GONE
+
+                // Verifica se o dispositivo não está em nenhuma das listas
+                val isNewDevice = !savedDevices.any { it.mac == device.mac } &&
+                        !scannedNotSavedDevices.any { it.mac == device.mac }
+
+                imgNew.visibility = if (isNewDevice) View.VISIBLE else View.GONE
 
                 // Carrega a imagem do dispositivo se existir
                 if (device.photoUrl != null) {
@@ -43,12 +54,12 @@ class ScanDevicesAdapter(
                     imgDevice.setImageResource(R.drawable.ic_device_unknown)
                 }
 
+                imgNew.visibility = if (device.isNew) View.VISIBLE else View.GONE
+
                 btnEditDevice.setOnClickListener {
                     onEditClick(device)
                 }
 
-                // Esconde o botão de salvar pois não será usado agora
-                btnSaveDevice.visibility = View.GONE
             }
         }
     }

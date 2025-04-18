@@ -23,7 +23,6 @@ import com.example.scaniot.databinding.ActivityScanDevicesBinding
 import com.example.scaniot.helper.Permissions
 import com.example.scaniot.model.Device
 import com.example.scaniot.model.ScanDevicesAdapter
-import com.example.scaniot.LoginActivity
 import com.google.android.material.textfield.TextInputEditText
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
@@ -44,6 +43,8 @@ class ScanDevicesActivity : AppCompatActivity() {
 
     private var currentDialogView: View? = null
 
+    private var scannedNotSavedDevices = mutableListOf<Device>()
+
     private val firebaseAuth by lazy {
         FirebaseAuth.getInstance()
     }
@@ -58,10 +59,10 @@ class ScanDevicesActivity : AppCompatActivity() {
 
     val currentUserId = firebaseAuth.currentUser?.uid ?: ""
 
-    val fakeDevices = listOf(
+    val scannedDevices = listOf(
         Device(
             ip = "192.168.1.101",
-            mac = "00:1A:2B:3C:4D:5E",
+            mac = "55:1A:2B:3C:4D:95",
             name = "Smart TV",
             description = "Samsung 4K UHD",
             vendor = "Samsung",
@@ -203,8 +204,7 @@ class ScanDevicesActivity : AppCompatActivity() {
     }
 
     private fun loadDevicesWithSavedData() {
-        val currentUser = firebaseAuth.currentUser
-        if (currentUser == null) {
+        val currentUser = firebaseAuth.currentUser ?: run {
             loadDevices()
             return
         }
@@ -213,26 +213,98 @@ class ScanDevicesActivity : AppCompatActivity() {
             .document(currentUser.uid)
             .collection("devices")
             .get()
-            .addOnSuccessListener { documents ->
-                val savedDevices = documents.map { it.toObject(Device::class.java) }
+            .addOnSuccessListener { savedDocuments ->
+                val savedDevices = savedDocuments.map { it.toObject(Device::class.java) }
 
-                // Mescla a lista fake com os dados salvos
-                val mergedDevices = fakeDevices.map { fakeDevice ->
-                    savedDevices.find { it.mac == fakeDevice.mac } ?: fakeDevice
-                }
+                firestore.collection("scanned_not_saved_devices")
+                    .document(currentUser.uid)
+                    .collection("devices")
+                    .get()
+                    .addOnSuccessListener { notSavedDocuments ->
+                        val existingNotSavedDevices = notSavedDocuments.map { it.toObject(Device::class.java) }
 
-                scanDevicesAdapter.addList(mergedDevices)
+                        // Identifica dispositivos realmente novos
+                        val newDevices = scannedDevices.filter { scannedDevice ->
+                            !savedDevices.any { it.mac == scannedDevice.mac } &&
+                                    !existingNotSavedDevices.any { it.mac == scannedDevice.mac }
+                        }
+
+                        // Adiciona os novos dispositivos ao Firestore (apenas uma vez)
+                        if (newDevices.isNotEmpty()) {
+                            saveNewDevicesToNotSaved(newDevices)
+                        }
+
+                        // Combina todas as listas para exibição
+                        val allDevices = scannedDevices.map { scannedDevice ->
+                            when {
+                                savedDevices.any { it.mac == scannedDevice.mac } ->
+                                    savedDevices.first { it.mac == scannedDevice.mac }
+                                existingNotSavedDevices.any { it.mac == scannedDevice.mac } ->
+                                    existingNotSavedDevices.first { it.mac == scannedDevice.mac }
+                                else -> scannedDevice.copy(isNew = true)
+                            }
+                        }
+
+                        // Atualiza o adapter
+                        scanDevicesAdapter = ScanDevicesAdapter(
+                            onEditClick = { device -> showEditDialog(device) },
+                            savedDevices = savedDevices,
+                            scannedNotSavedDevices = existingNotSavedDevices
+                        )
+                        binding.rvListScanDevices.adapter = scanDevicesAdapter
+                        scanDevicesAdapter.addList(allDevices)
+                    }
             }
-            .addOnFailureListener {
-                loadDevices()
-            }
+            .addOnFailureListener { loadDevices() }
     }
 
-    private fun setupRecyclerView() {
-        scanDevicesAdapter = ScanDevicesAdapter { device ->
-            showEditDialog(device)
+    private fun saveNewDevicesToNotSaved(newDevices: List<Device>) {
+        val user = firebaseAuth.currentUser ?: return
+        val batch = firestore.batch()
+
+        newDevices.forEach { device ->
+            val docRef = firestore.collection("scanned_not_saved_devices")
+                .document(user.uid)
+                .collection("devices")
+                .document(device.mac)
+            batch.set(docRef, device.copy(userId = user.uid))
         }
-        
+
+        batch.commit().addOnCompleteListener {
+            // Não precisa fazer nada aqui, a lista será atualizada no próximo carregamento
+        }
+    }
+
+    // Função para salvar dispositivos escaneados mas não salvos
+    private fun saveScannedNotSavedDevices(devices: List<Device>) {
+        val user = firebaseAuth.currentUser ?: return
+
+        val batch = firestore.batch()
+
+        devices.forEach { device ->
+            val docRef = firestore.collection("scanned_not_saved_devices")
+                .document(user.uid)
+                .collection("devices")
+                .document(device.mac)
+
+            batch.set(docRef, device.copy(userId = user.uid))
+        }
+
+        batch.commit().addOnFailureListener {
+            Toast.makeText(this, "Error saving scanned devices", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+
+    private fun setupRecyclerView() {
+        scanDevicesAdapter = ScanDevicesAdapter (
+            onEditClick = { device ->
+                showEditDialog(device)
+            },
+            savedDevices = emptyList(), // Será atualizado em loadDevicesWithSavedData
+            scannedNotSavedDevices = emptyList() // Será atualizado em loadDevicesWithSavedData
+        )
+
         binding.rvListScanDevices.apply {
             adapter = scanDevicesAdapter
             layoutManager = LinearLayoutManager(this@ScanDevicesActivity)
@@ -254,9 +326,6 @@ class ScanDevicesActivity : AppCompatActivity() {
             findViewById<TextInputEditText>(R.id.editVendor).setText(device.vendor)
             findViewById<TextInputEditText>(R.id.editModel).setText(device.deviceModel)
             findViewById<TextInputEditText>(R.id.editLocation).setText(device.deviceLocation)
-
-            // Esconde o botão de foto por enquanto
-            //findViewById<Button>(R.id.button).visibility = View.GONE
         }
 
         dialogView.findViewById<Button>(R.id.btnLoadImageGallery).setOnClickListener {
@@ -297,6 +366,7 @@ class ScanDevicesActivity : AppCompatActivity() {
             .show()
     }
 
+
     private fun uploadGallery(device: Device) {
 
         val imgName = UUID.randomUUID().toString()
@@ -327,7 +397,7 @@ class ScanDevicesActivity : AppCompatActivity() {
                             updateDeviceData(thisMac, dados)
                             //scanDevicesAdapter.updateDevice(updatedDeviceGlr)
                             loadDevicesWithSavedData()
-                    }
+                        }
                 }
                 .addOnFailureListener {
                     Toast.makeText(this, "Error uploading image", Toast.LENGTH_LONG).show()
@@ -376,21 +446,25 @@ class ScanDevicesActivity : AppCompatActivity() {
     }
 
     private fun saveDeviceToUserCollection(device: Device) {
-        val user = firebaseAuth.currentUser
-        if (user == null) {
-            Toast.makeText(this, "User not authenticated", Toast.LENGTH_SHORT).show()
-            return
-        }
+        val user = firebaseAuth.currentUser ?: return
 
-        // Adiciona o userId ao dispositivo
-        val deviceWithUser = device.copy(userId = user.uid)
+        val deviceWithUser = device.copy(userId = user.uid, isNew = false)
 
+        // Primeiro salva no firestore
         firestore.collection("saved_devices")
             .document(user.uid)
             .collection("devices")
-            .document(device.mac) // Usa o MAC como ID do documento
+            .document(device.mac)
             .set(deviceWithUser)
             .addOnSuccessListener {
+                // Remove da lista de não salvos se existir
+                firestore.collection("scanned_not_saved_devices")
+                    .document(user.uid)
+                    .collection("devices")
+                    .document(device.mac)
+                    .delete()
+
+                scannedNotSavedDevices.removeAll { it.mac == device.mac }
                 Toast.makeText(this, "Device saved successfully", Toast.LENGTH_SHORT).show()
             }
             .addOnFailureListener { e ->
@@ -398,8 +472,9 @@ class ScanDevicesActivity : AppCompatActivity() {
             }
     }
 
+
     private fun loadDevices() {
-        scanDevicesAdapter.addList(fakeDevices)
+        scanDevicesAdapter.addList(scannedDevices)
     }
 
     private fun initializeToolbar() {
