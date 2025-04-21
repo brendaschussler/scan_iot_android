@@ -74,6 +74,12 @@ class RegisterActivity : AppCompatActivity() {
     private fun validateFields(): Boolean {
         val (fieldId, errorMessage) = viewModel.getFieldValidationErrors()
 
+        // not good solution por enquanto
+        binding.textInputLayoutName.error = null
+        binding.textInputLayoutEmail.error = null
+        binding.textInputLayoutPassword.error = null
+        binding.textInputLayoutConfirmPassword.error = null
+
         if (fieldId != 0) {
             when (fieldId) {
                 R.id.textInputLayoutName -> binding.textInputLayoutName.error = errorMessage

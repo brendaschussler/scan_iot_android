@@ -1,92 +1,162 @@
 package com.example.scaniot.model
 
 import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.Query
 
-// CaptureRepository.kt
 object CaptureRepository {
     private val firestore by lazy { FirebaseFirestore.getInstance() }
     private val auth by lazy { FirebaseAuth.getInstance() }
 
-    fun saveLastCapture(devices: List<Device>, onComplete: (Boolean) -> Unit = {}) {
+    // Salva uma nova captura no histórico
+    fun saveNewCapture(devices: List<Device>, onComplete: (Boolean) -> Unit = {}) {
         val userId = auth.currentUser?.uid ?: run {
             onComplete(false)
             return
         }
 
+        val timestamp = System.currentTimeMillis()
+        val sessionId = firestore.collection("captured_list").document().id
+
         val batch = firestore.batch()
-        val collectionRef = firestore.collection("users").document(userId).collection("last_capture")
+        val collectionRef = firestore.collection("captured_list")
+            .document(userId)
+            .collection("captures")
+            .document() // Gera um novo ID automático para esta sessão de captura
 
-        // Limpa captura anterior
-        collectionRef.get().addOnSuccessListener { snapshot ->
-            snapshot.documents.forEach { doc ->
-                batch.delete(doc.reference)
-            }
 
-            // Adiciona novos dispositivos
-            devices.forEachIndexed { index, device ->
-                val docRef = collectionRef.document("device_$index")
-                batch.set(docRef, device)
-            }
-
-            batch.commit()
-                .addOnSuccessListener { onComplete(true) }
-                .addOnFailureListener { onComplete(false) }
+        val devicesMap = devices.associate { device ->
+            device.mac to hashMapOf(
+                "name" to device.name,
+                "mac" to device.mac,
+                "captureTotal" to device.captureTotal,
+                "captureProgress" to device.captureProgress,
+                "capturing" to device.capturing,
+                "lastCaptureTimestamp" to device.lastCaptureTimestamp,
+                // Adicione outros campos necessários
+                "ip" to device.ip,
+                "vendor" to device.vendor,
+                "deviceModel" to device.deviceModel,
+                "deviceLocation" to device.deviceLocation
+            )
         }
+
+        val captureSession = hashMapOf(
+            "timestamp" to timestamp,
+            "devices" to devicesMap
+        )
+
+        firestore.collection("captured_list")
+            .document(userId)
+            .collection("captures")
+            .document(sessionId)
+            .set(captureSession)
+            .addOnSuccessListener { onComplete(true) }
+            .addOnFailureListener { onComplete(false) }
     }
 
-    fun getLastCapture(onSuccess: (List<Device>) -> Unit, onFailure: () -> Unit = {}) {
+    fun getAllCapturedDevices(onSuccess: (List<Device>) -> Unit, onFailure: () -> Unit = {}) {
         val userId = auth.currentUser?.uid ?: run {
             onFailure()
             return
         }
 
-        firestore.collection("users")
+        firestore.collection("captured_list")
             .document(userId)
-            .collection("last_capture")
+            .collection("captures")
             .get()
             .addOnSuccessListener { snapshot ->
-                val devices = snapshot.documents.mapNotNull { it.toObject(Device::class.java) }
-                onSuccess(devices)
+                val allDevices = mutableListOf<Device>()
+
+                snapshot.documents.forEach { doc ->
+                    val timestamp = doc.getLong("timestamp") ?: System.currentTimeMillis()
+                    val devicesMap = doc.get("devices") as? Map<String, Map<String, Any>> ?: emptyMap()
+
+                    devicesMap.forEach { (mac, deviceData) ->
+                        allDevices.add(
+                            Device(
+                                name = deviceData["name"] as? String ?: "",
+                                mac = deviceData["mac"] as? String ?: "",
+                                captureTotal = (deviceData["captureTotal"] as? Long)?.toInt() ?: 0,
+                                captureProgress = (deviceData["captureProgress"] as? Long)?.toInt() ?: 0,
+                                capturing = deviceData["capturing"] as? Boolean ?: false,
+                                lastCaptureTimestamp = deviceData["lastCaptureTimestamp"] as? Long ?: timestamp,
+                                ip = deviceData["ip"] as? String ?: "",
+                                vendor = deviceData["vendor"] as? String ?: "",
+                                deviceModel = deviceData["deviceModel"] as? String ?: "",
+                                deviceLocation = deviceData["deviceLocation"] as? String ?: "",
+                                sessionId = doc.id,
+                                sessionTimestamp = timestamp // Adicionamos este novo campo
+                            )
+
+                        )
+                    }
+                }
+
+                onSuccess(allDevices)
             }
             .addOnFailureListener { onFailure() }
     }
 
-    fun updateCaptureState(device: Device, isCapturing: Boolean) {
+
+    // Atualiza o progresso em uma captura específica
+    fun updateCaptureProgress(sessionId: String, device: Device, progress: Int, total: Int) {
         val userId = auth.currentUser?.uid ?: return
 
-        firestore.collection("users")
+        val devicePath = "devices.${device.mac}"
+
+        firestore.collection("captured_list")
             .document(userId)
-            .collection("last_capture")
-            .whereEqualTo("mac", device.mac)
-            .get()
-            .addOnSuccessListener { snapshot ->
-                snapshot.documents.firstOrNull()?.reference?.update("capturing", isCapturing)
-            }
+            .collection("captures")
+            .document(sessionId)
+            .update(
+                "$devicePath.capturing", progress < total,
+                "$devicePath.captureProgress", progress,
+                "$devicePath.captureTotal", total,
+                "$devicePath.lastCaptureTimestamp", System.currentTimeMillis()
+            )
     }
 
-    fun updateCaptureProgress(device: Device, progress: Int, total: Int) {
+    fun deleteCaptureSession(sessionId: String, onComplete: (Boolean) -> Unit) {
+        val userId = auth.currentUser?.uid ?: run {
+            onComplete(false)
+            return
+        }
+
+        firestore.collection("captured_list")
+            .document(userId)
+            .collection("captures")
+            .document(sessionId)
+            .delete()
+            .addOnSuccessListener { onComplete(true) }
+            .addOnFailureListener { onComplete(false) }
+    }
+
+    fun deleteDeviceFromCapture(sessionId: String, deviceMac: String, onComplete: (Boolean) -> Unit) {
+        val userId = auth.currentUser?.uid ?: run {
+            onComplete(false)
+            return
+        }
+
+        firestore.collection("captured_list")
+            .document(userId)
+            .collection("captures")
+            .document(sessionId)
+            .update("devices.$deviceMac", FieldValue.delete())
+            .addOnSuccessListener { onComplete(true) }
+            .addOnFailureListener { onComplete(false) }
+    }
+
+    fun updateCaptureState(sessionId: String, device: Device, isCapturing: Boolean) {
         val userId = auth.currentUser?.uid ?: return
 
-        firestore.collection("users")
+        firestore.collection("captured_list")
             .document(userId)
-            .collection("last_capture")
-            .whereEqualTo("mac", device.mac)
-            .get()
-            .addOnSuccessListener { snapshot ->
-                if (!snapshot.isEmpty) {
-                    val docId = snapshot.documents[0].id
-                    firestore.collection("users")
-                        .document(userId)
-                        .collection("last_capture")
-                        .document(docId)
-                        .update(
-                            "isCapturing", progress < total,
-                            "captureProgress", progress,
-                            "captureTotal", total,
-                            "lastCaptureTimestamp", System.currentTimeMillis()
-                        )
-                }
-            }
+            .collection("captures")
+            .document(sessionId)
+            .update("devices.${device.mac}.capturing", isCapturing)
     }
+
+
 }

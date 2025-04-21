@@ -15,7 +15,6 @@ class ScanDevicesAdapter(
     private val scannedNotSavedDevices: List<Device> = emptyList()
 ) : RecyclerView.Adapter<ScanDevicesAdapter.ScanDeviceViewHolder>() {
 
-
     private var listScanDevices = emptyList<Device>()
 
     fun addList(myList: List<Device>) {
@@ -44,11 +43,11 @@ class ScanDevicesAdapter(
 
                 imgNew.visibility = if (isNewDevice) View.VISIBLE else View.GONE
 
-                // Carrega a imagem do dispositivo se existir
+
                 if (device.photoUrl != null) {
                     Glide.with(itemView.context)
                         .load(device.photoUrl)
-                        .placeholder(R.drawable.ic_device_unknown) // Imagem padrão
+                        .placeholder(R.drawable.ic_device_unknown) // Img default
                         .into(imgDevice)
                 } else {
                     imgDevice.setImageResource(R.drawable.ic_device_unknown)

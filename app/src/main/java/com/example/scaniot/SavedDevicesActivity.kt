@@ -105,8 +105,6 @@ class SavedDevicesActivity : AppCompatActivity() {
     }
 
     private fun startCapturedPacketsActivity(devices: List<Device>, packetCount: Int, filename: String) {
-        // Atualiza os dispositivos com informações de captura
-
         val devicesWithCapture = devices.map {
             it.copy(
                 capturing = true,
@@ -116,8 +114,8 @@ class SavedDevicesActivity : AppCompatActivity() {
             )
         }
 
-        // Salva no Firestore
-        CaptureRepository.saveLastCapture(devicesWithCapture) { success ->
+        // Salva como uma nova captura no histórico
+        CaptureRepository.saveNewCapture(devicesWithCapture) { success ->
             if (success) {
                 val intent = Intent(this, CapturedPacketsActivity::class.java).apply {
                     putParcelableArrayListExtra("selected_devices", ArrayList(devicesWithCapture))
@@ -130,6 +128,7 @@ class SavedDevicesActivity : AppCompatActivity() {
             }
         }
     }
+
 
     private fun setupRecyclerView() {
         savedDevicesAdapter = SavedDevicesAdapter(

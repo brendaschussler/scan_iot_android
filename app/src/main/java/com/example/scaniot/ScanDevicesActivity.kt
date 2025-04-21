@@ -223,18 +223,16 @@ class ScanDevicesActivity : AppCompatActivity() {
                     .addOnSuccessListener { notSavedDocuments ->
                         val existingNotSavedDevices = notSavedDocuments.map { it.toObject(Device::class.java) }
 
-                        // Identifica dispositivos realmente novos
                         val newDevices = scannedDevices.filter { scannedDevice ->
                             !savedDevices.any { it.mac == scannedDevice.mac } &&
                                     !existingNotSavedDevices.any { it.mac == scannedDevice.mac }
                         }
 
-                        // Adiciona os novos dispositivos ao Firestore (apenas uma vez)
+                        // Add new devices to Firestore
                         if (newDevices.isNotEmpty()) {
                             saveNewDevicesToNotSaved(newDevices)
                         }
 
-                        // Combina todas as listas para exibição
                         val allDevices = scannedDevices.map { scannedDevice ->
                             when {
                                 savedDevices.any { it.mac == scannedDevice.mac } ->
@@ -245,7 +243,6 @@ class ScanDevicesActivity : AppCompatActivity() {
                             }
                         }
 
-                        // Atualiza o adapter
                         scanDevicesAdapter = ScanDevicesAdapter(
                             onEditClick = { device -> showEditDialog(device) },
                             savedDevices = savedDevices,
@@ -271,11 +268,11 @@ class ScanDevicesActivity : AppCompatActivity() {
         }
 
         batch.commit().addOnCompleteListener {
-            // Não precisa fazer nada aqui, a lista será atualizada no próximo carregamento
+             // list will be updated on next loading
         }
     }
 
-    // Função para salvar dispositivos escaneados mas não salvos
+
     private fun saveScannedNotSavedDevices(devices: List<Device>) {
         val user = firebaseAuth.currentUser ?: return
 
@@ -310,7 +307,7 @@ class ScanDevicesActivity : AppCompatActivity() {
             layoutManager = LinearLayoutManager(this@ScanDevicesActivity)
             setHasFixedSize(true)
 
-            // Configurações adicionais para a barra de rolagem
+            // config to scroll bar
             isVerticalScrollBarEnabled = true
             scrollBarStyle = View.SCROLLBARS_OUTSIDE_OVERLAY
         }
@@ -332,7 +329,6 @@ class ScanDevicesActivity : AppCompatActivity() {
             openGalleryLauncher.launch("image/*")
         }
 
-        // Configuração do botão da câmera
         dialogView.findViewById<Button>(R.id.btnOpenCamera).setOnClickListener {
             val cameraIntent = Intent(MediaStore.ACTION_IMAGE_CAPTURE)
             if (cameraIntent.resolveActivity(packageManager) != null) {
@@ -341,7 +337,6 @@ class ScanDevicesActivity : AppCompatActivity() {
                 Toast.makeText(this, "No camera app found", Toast.LENGTH_SHORT).show()
             }
         }
-
 
         AlertDialog.Builder(this)
             .setView(dialogView)
@@ -357,7 +352,6 @@ class ScanDevicesActivity : AppCompatActivity() {
                 saveDeviceToUserCollection(editedDevice)
                 loadDevicesWithSavedData()
                 uploadGallery(
-                    //dialogView.findViewById<TextInputEditText>(R.id.editName).text.toString(),
                     device
                 )
             }
@@ -426,9 +420,6 @@ class ScanDevicesActivity : AppCompatActivity() {
                 .addOnFailureListener {
                     Toast.makeText(this, "Error uploading image", Toast.LENGTH_LONG).show()
                 }
-
-
-
         }
     }
 
@@ -450,14 +441,14 @@ class ScanDevicesActivity : AppCompatActivity() {
 
         val deviceWithUser = device.copy(userId = user.uid, isNew = false)
 
-        // Primeiro salva no firestore
+        // Save in firestore
         firestore.collection("saved_devices")
             .document(user.uid)
             .collection("devices")
             .document(device.mac)
             .set(deviceWithUser)
             .addOnSuccessListener {
-                // Remove da lista de não salvos se existir
+                // Remove from not saved list if necessary
                 firestore.collection("scanned_not_saved_devices")
                     .document(user.uid)
                     .collection("devices")
@@ -471,7 +462,6 @@ class ScanDevicesActivity : AppCompatActivity() {
                 Toast.makeText(this, "Error saving device: ${e.message}", Toast.LENGTH_SHORT).show()
             }
     }
-
 
     private fun loadDevices() {
         scanDevicesAdapter.addList(scannedDevices)

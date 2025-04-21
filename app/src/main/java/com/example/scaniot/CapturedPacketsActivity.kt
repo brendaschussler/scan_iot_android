@@ -61,11 +61,15 @@ class CapturedPacketsActivity : AppCompatActivity() {
     }
 
     private fun loadSelectedDevices() {
+        loadAllCapturedDevices()
+    }
+
+    private fun loadCapturedDevices() {
         val forceRefresh = intent.getBooleanExtra("force_refresh", false)
 
         if (forceRefresh || intent.getParcelableArrayListExtra<Device>("selected_devices") == null) {
-            // Busca do Firestore garantindo estado atualizado
-            fetchLastCaptureWithState()
+            // Carrega todo o histórico de capturas
+            loadAllCapturedDevices()
         } else {
             // Usa os dispositivos do intent (quando vem da SavedDevices)
             val devices = intent.getParcelableArrayListExtra<Device>("selected_devices")!!
@@ -73,25 +77,28 @@ class CapturedPacketsActivity : AppCompatActivity() {
         }
     }
 
-    private fun fetchLastCaptureWithState() {
-        CaptureRepository.getLastCapture(
+    private fun loadAllCapturedDevices() {
+        CaptureRepository.getAllCapturedDevices(
             onSuccess = { devices ->
-                // Verifica se há capturas ativas
-                val updatedDevices = devices.map { device ->
-                    if (device.capturing) {
-                        device.copy(capturing = true)  // Mantém estado ativo
-                    } else {
-                        device
+                // Ordena por timestamp decrescente e agrupa por sessão
+                val groupedDevices = devices
+                    .groupBy { it.sessionId }
+                    .flatMap { (_, sessionDevices) ->
+                        // Ordena dispositivos dentro de cada sessão
+                        sessionDevices.sortedByDescending { it.lastCaptureTimestamp }
                     }
-                }
-                capturedPacketsAdapter.submitList(updatedDevices)
+                    .sortedByDescending { it.lastCaptureTimestamp }
+
+                capturedPacketsAdapter.submitList(groupedDevices)
             },
             onFailure = {
-                showMessage("Failed to load capture session")
+                showMessage("Failed to load capture history")
                 finish()
             }
         )
     }
+
+
     private fun initializeToolbar() {
         val toolbar = binding.includeTbCapturedPackets.tbMain
         setSupportActionBar(toolbar)

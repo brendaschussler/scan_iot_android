@@ -23,5 +23,7 @@ data class Device(
     val captureTotal: Int = 100,
     val lastCaptureTimestamp: Long? = null,
     var isSaved: Boolean = false,
-    var isNew: Boolean = false
+    var isNew: Boolean = false,
+    val sessionId: String = "",
+    val sessionTimestamp: Long = 0L
 ) : Parcelable
