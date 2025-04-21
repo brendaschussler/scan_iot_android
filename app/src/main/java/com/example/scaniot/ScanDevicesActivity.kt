@@ -65,80 +65,60 @@ class ScanDevicesActivity : AppCompatActivity() {
             ip = "192.168.1.111",
             mac = "55:1A:2B:3C:4D:95",
             name = "Smart TV",
-            description = "Samsung 4K UHD",
+            description = "Samsung 4K UHD Smart TV",
             vendor = "Samsung",
-            deviceModel = "4k UHD",
-            deviceLocation = "Home",
+            deviceModel = "QN65Q80AAFXZA",
+            deviceLocation = "Living Room",
+            deviceVersion = "T-KT2DEUC-2305.5",
+            deviceType = "television",
             userId = currentUserId
         ),
         Device(
             ip = "192.168.1.102",
             mac = "00:1B:2C:3D:4E:5F",
-            name = "Smartphone",
-            description = "Android Phone",
+            name = "My Smartphone",
+            description = "Personal Android Phone",
             vendor = "Xiaomi",
-            deviceModel = "Redmi Note 10",
-            deviceLocation = "Home",
+            deviceModel = "Redmi Note 10 Pro",
+            deviceLocation = "Bedroom",
+            deviceVersion = "Android 13",
+            deviceType = "smartphone",
             userId = currentUserId
         ),
         Device(
             ip = "192.168.1.103",
             mac = "00:1C:2D:3E:4F:5A",
-            name = "Notebook",
-            description = "Work laptop",
+            name = "Work Laptop",
+            description = "Company issued Macbook",
             vendor = "Apple",
-            deviceModel = "Macbook Air",
-            deviceLocation = "Work",
+            deviceModel = "MacBook Air M2",
+            deviceLocation = "Home Office",
+            deviceVersion = "macOS 14.0",
+            deviceType = "laptop",
             userId = currentUserId
         ),
         Device(
             ip = "192.168.1.104",
             mac = "00:1D:2E:3F:4A:5B",
-            name = "Smart Light",
-            description = "RGB Bulb",
+            name = "Bedroom Light",
+            description = "RGB Smart Bulb",
             vendor = "Philips",
-            deviceModel = "Macbook Air",
-            deviceLocation = "Work",
+            deviceModel = "Hue White and Color",
+            deviceLocation = "Master Bedroom",
+            deviceVersion = "1.93.3",
+            deviceType = "light",
             userId = currentUserId
         ),
         Device(
             ip = "192.168.1.105",
             mac = "00:1E:2F:3A:4B:5C",
-            name = "Security Camera",
-            description = "Outdoor camera",
+            name = "Front Door Camera",
+            description = "Outdoor Security Camera",
             vendor = "TP-Link",
-            deviceModel = "Macbook Air",
-            deviceLocation = "Work",
-            userId = currentUserId
-        ),
-        Device(
-            ip = "192.168.1.105",
-            mac = "00:1E:2F:3A:4B:5C",
-            name = "Security Camera",
-            description = "Outdoor camera",
-            vendor = "TP-Link",
-            deviceModel = "Macbook Air",
-            deviceLocation = "Work",
-            userId = currentUserId
-        ),
-        Device(
-            ip = "192.168.1.105",
-            mac = "00:1E:2F:3A:4B:5C",
-            name = "Security Camera",
-            description = "Outdoor camera",
-            vendor = "TP-Link",
-            deviceModel = "Macbook Air",
-            deviceLocation = "Work",
-            userId = currentUserId
-        ),
-        Device(
-            ip = "192.168.1.105",
-            mac = "00:1E:2F:3A:4B:5C",
-            name = "Security Camera",
-            description = "Outdoor camera",
-            vendor = "TP-Link",
-            deviceModel = "Macbook Air",
-            deviceLocation = "Work",
+            deviceModel = "Tapo C310",
+            deviceLocation = "Front Entrance",
+            deviceVersion = "1.1.9 Build 20230905",
+            deviceType = "camera",
             userId = currentUserId
         )
     )
@@ -352,6 +332,8 @@ class ScanDevicesActivity : AppCompatActivity() {
             findViewById<TextInputEditText>(R.id.editVendor).setText(device.vendor)
             findViewById<TextInputEditText>(R.id.editModel).setText(device.deviceModel)
             findViewById<TextInputEditText>(R.id.editLocation).setText(device.deviceLocation)
+            findViewById<TextInputEditText>(R.id.editVersion).setText(device.deviceVersion)
+            findViewById<TextInputEditText>(R.id.editType).setText(device.deviceType)
         }
 
         dialogView.findViewById<Button>(R.id.btnLoadImageGallery).setOnClickListener {
@@ -376,7 +358,9 @@ class ScanDevicesActivity : AppCompatActivity() {
                     description = dialogView.findViewById<TextInputEditText>(R.id.editDescription).text.toString(),
                     vendor = dialogView.findViewById<TextInputEditText>(R.id.editVendor).text.toString(),
                     deviceModel = dialogView.findViewById<TextInputEditText>(R.id.editModel).text.toString(),
-                    deviceLocation = dialogView.findViewById<TextInputEditText>(R.id.editLocation).text.toString()
+                    deviceLocation = dialogView.findViewById<TextInputEditText>(R.id.editLocation).text.toString(),
+                    deviceVersion = dialogView.findViewById<TextInputEditText>(R.id.editVersion).text.toString(),
+                    deviceType = dialogView.findViewById<TextInputEditText>(R.id.editType).text.toString()
                 )
                 saveDeviceToUserCollection(editedDevice)
                 loadDevicesWithSavedData()

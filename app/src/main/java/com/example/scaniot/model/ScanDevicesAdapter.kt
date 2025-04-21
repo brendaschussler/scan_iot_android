@@ -35,6 +35,8 @@ class ScanDevicesAdapter(
                 txtVendor.text = device.vendor
                 txtModel.text = device.deviceModel
                 txtLocation.text = device.deviceLocation
+                txtVersion.text = device.deviceVersion
+                txtType.text = device.deviceType
                 imgNew.visibility = if (device.isNew) View.VISIBLE else View.GONE
 
                 // Verifica se o dispositivo não está em nenhuma das listas

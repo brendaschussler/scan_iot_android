@@ -12,12 +12,11 @@ data class Device(
     var description: String = "unknown",
     var vendor: String = "unknown",
     var deviceModel: String = "unknown",
+    var deviceType: String = "unknown",
+    var deviceVersion: String = "unknown",
     var deviceLocation: String = "unknown",
     var photoUrl: String? = null,
     val userId: String = "",
-    //var packetsCaptured: Int = 0,
-    //var totalPackets: Int = 0
-    //@PropertyName("capturing")  // Anotação para mapear para o Firestore
     val capturing: Boolean = false,
     val captureProgress: Int = 0,
     val captureTotal: Int = 100,

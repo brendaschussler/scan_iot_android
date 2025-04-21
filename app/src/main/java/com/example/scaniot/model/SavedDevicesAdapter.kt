@@ -38,6 +38,8 @@ class SavedDevicesAdapter(
                 txtVendorSaved.text = device.vendor
                 txtModelSaved.text = device.deviceModel ?: "Unknown"
                 txtLocationSaved.text = device.deviceLocation ?: "Not specified"
+                txtVersionSaved.text = device.deviceVersion ?: "Not specified"
+                txtTypeSaved.text = device.deviceType ?: "Not specified"
 
                 // Carrega a imagem do dispositivo
                 if (device.photoUrl != null) {
