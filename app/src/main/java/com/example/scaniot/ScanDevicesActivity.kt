@@ -7,6 +7,7 @@ import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.provider.MediaStore
+import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
 import android.widget.Button
@@ -61,7 +62,7 @@ class ScanDevicesActivity : AppCompatActivity() {
 
     val scannedDevices = listOf(
         Device(
-            ip = "192.168.1.101",
+            ip = "192.168.1.111",
             mac = "55:1A:2B:3C:4D:95",
             name = "Smart TV",
             description = "Samsung 4K UHD",
@@ -223,24 +224,50 @@ class ScanDevicesActivity : AppCompatActivity() {
                     .addOnSuccessListener { notSavedDocuments ->
                         val existingNotSavedDevices = notSavedDocuments.map { it.toObject(Device::class.java) }
 
+                        // Identificar novos dispositivos escaneados que não estão salvos
                         val newDevices = scannedDevices.filter { scannedDevice ->
                             !savedDevices.any { it.mac == scannedDevice.mac } &&
                                     !existingNotSavedDevices.any { it.mac == scannedDevice.mac }
                         }
 
-                        // Add new devices to Firestore
+                        // Adicionar novos dispositivos à coleção de não salvos
                         if (newDevices.isNotEmpty()) {
                             saveNewDevicesToNotSaved(newDevices)
                         }
 
+                        // Lista para armazenar dispositivos que precisam atualizar o IP no Firebase
+                        val devicesToUpdate = mutableListOf<Device>()
+
+                        // Criar lista final combinando informações
                         val allDevices = scannedDevices.map { scannedDevice ->
                             when {
-                                savedDevices.any { it.mac == scannedDevice.mac } ->
-                                    savedDevices.first { it.mac == scannedDevice.mac }
-                                existingNotSavedDevices.any { it.mac == scannedDevice.mac } ->
-                                    existingNotSavedDevices.first { it.mac == scannedDevice.mac }
+                                // Dispositivo salvo - mantém todas as informações salvas, mas atualiza o IP
+                                savedDevices.any { it.mac == scannedDevice.mac } -> {
+                                    val savedDevice = savedDevices.first { it.mac == scannedDevice.mac }
+                                    if (savedDevice.ip != scannedDevice.ip) {
+                                        // Se o IP mudou, adiciona à lista de atualização
+                                        devicesToUpdate.add(savedDevice.copy(ip = scannedDevice.ip))
+                                    }
+                                    savedDevice.copy(
+                                        ip = scannedDevice.ip, // Atualiza apenas o IP
+                                        isNew = false
+                                    )
+                                }
+                                // Dispositivo não salvo mas já escaneado antes
+                                existingNotSavedDevices.any { it.mac == scannedDevice.mac } -> {
+                                    val notSavedDevice = existingNotSavedDevices.first { it.mac == scannedDevice.mac }
+                                    notSavedDevice.copy(
+                                        ip = scannedDevice.ip // Atualiza apenas o IP
+                                    )
+                                }
+                                // Novo dispositivo nunca visto antes
                                 else -> scannedDevice.copy(isNew = true)
                             }
+                        }
+
+                        // Atualizar IPs no Firebase se necessário
+                        if (devicesToUpdate.isNotEmpty()) {
+                            updateIpsInFirebase(devicesToUpdate)
                         }
 
                         scanDevicesAdapter = ScanDevicesAdapter(
@@ -253,6 +280,28 @@ class ScanDevicesActivity : AppCompatActivity() {
                     }
             }
             .addOnFailureListener { loadDevices() }
+    }
+
+    private fun updateIpsInFirebase(devices: List<Device>) {
+        val currentUser = firebaseAuth.currentUser ?: return
+        val batch = firestore.batch()
+
+        devices.forEach { device ->
+            val docRef = firestore.collection("saved_devices")
+                .document(currentUser.uid)
+                .collection("devices")
+                .document(device.mac)
+
+            batch.update(docRef, "ip", device.ip)
+        }
+
+        batch.commit()
+            .addOnSuccessListener {
+                Log.d("ScanDevices", "IPs atualizados com sucesso para ${devices.size} dispositivos")
+            }
+            .addOnFailureListener { e ->
+                Log.e("ScanDevices", "Erro ao atualizar IPs: ${e.message}")
+            }
     }
 
     private fun saveNewDevicesToNotSaved(newDevices: List<Device>) {
@@ -269,26 +318,6 @@ class ScanDevicesActivity : AppCompatActivity() {
 
         batch.commit().addOnCompleteListener {
              // list will be updated on next loading
-        }
-    }
-
-
-    private fun saveScannedNotSavedDevices(devices: List<Device>) {
-        val user = firebaseAuth.currentUser ?: return
-
-        val batch = firestore.batch()
-
-        devices.forEach { device ->
-            val docRef = firestore.collection("scanned_not_saved_devices")
-                .document(user.uid)
-                .collection("devices")
-                .document(device.mac)
-
-            batch.set(docRef, device.copy(userId = user.uid))
-        }
-
-        batch.commit().addOnFailureListener {
-            Toast.makeText(this, "Error saving scanned devices", Toast.LENGTH_SHORT).show()
         }
     }
 
