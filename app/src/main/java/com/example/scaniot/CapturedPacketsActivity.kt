@@ -4,6 +4,8 @@ import android.app.AlertDialog
 import android.content.Context
 import android.content.Intent
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.view.View
 import android.widget.Toast
 import androidx.activity.enableEdgeToEdge
@@ -13,9 +15,9 @@ import androidx.core.view.WindowInsetsCompat
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.example.scaniot.databinding.ActivityCapturedPacketsBinding
 import com.example.scaniot.model.CaptureRepository
+import com.example.scaniot.LoginActivity
 import com.example.scaniot.model.CapturedPacketsAdapter
 import com.example.scaniot.model.Device
-import com.example.scaniot.view.LoginActivity
 import com.google.firebase.auth.FirebaseAuth
 
 class CapturedPacketsActivity : AppCompatActivity() {
@@ -27,6 +29,9 @@ class CapturedPacketsActivity : AppCompatActivity() {
         FirebaseAuth.getInstance()
     }
 
+    private val updateHandler = Handler(Looper.getMainLooper())
+    private val updateInterval = 2000L // 2 segundos
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
@@ -36,12 +41,51 @@ class CapturedPacketsActivity : AppCompatActivity() {
 
         initializeToolbar()
         setupRecyclerView()
+        setupSwipeRefresh()
         loadSelectedDevices()
 
         ViewCompat.setOnApplyWindowInsetsListener(findViewById(R.id.main)) { v, insets ->
             val systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
             v.setPadding(systemBars.left, systemBars.top, systemBars.right, systemBars.bottom)
             insets
+        }
+    }
+
+    private fun setupSwipeRefresh() {
+        binding.swipeRefreshLayout.setOnRefreshListener {
+            refreshData()
+        }
+    }
+
+    private fun refreshData(showLoading: Boolean = true) {
+        if (showLoading) {
+            binding.swipeRefreshLayout.isRefreshing = true
+        }
+
+        CaptureRepository.getAllCapturedDevices(
+            onSuccess = { devices ->
+                val processedDevices = processDevices(devices)
+                updateDeviceList(processedDevices)
+                binding.swipeRefreshLayout.isRefreshing = false
+            },
+            onFailure = {
+                showMessage("Failed to refresh data")
+                binding.swipeRefreshLayout.isRefreshing = false
+            }
+        )
+    }
+
+    private fun processDevices(devices: List<Device>): List<Device> {
+        return devices.sortedByDescending { it.lastCaptureTimestamp }
+    }
+
+    private fun updateDeviceList(newDevices: List<Device>) {
+        // Verifica se houve mudanças antes de atualizar
+        if (capturedPacketsAdapter.currentList != newDevices) {
+            capturedPacketsAdapter.submitList(newDevices) {
+                // Callback opcional após a atualização
+                binding.rvListCapturedPackets.scrollToPosition(0)
+            }
         }
     }
 
@@ -61,11 +105,15 @@ class CapturedPacketsActivity : AppCompatActivity() {
     }
 
     private fun loadSelectedDevices() {
+        loadAllCapturedDevices()
+    }
+
+    private fun loadCapturedDevices() {
         val forceRefresh = intent.getBooleanExtra("force_refresh", false)
 
         if (forceRefresh || intent.getParcelableArrayListExtra<Device>("selected_devices") == null) {
-            // Busca do Firestore garantindo estado atualizado
-            fetchLastCaptureWithState()
+            // Carrega todo o histórico de capturas
+            loadAllCapturedDevices()
         } else {
             // Usa os dispositivos do intent (quando vem da SavedDevices)
             val devices = intent.getParcelableArrayListExtra<Device>("selected_devices")!!
@@ -73,25 +121,35 @@ class CapturedPacketsActivity : AppCompatActivity() {
         }
     }
 
-    private fun fetchLastCaptureWithState() {
-        CaptureRepository.getLastCapture(
+    private fun loadAllCapturedDevices() {
+        CaptureRepository.getAllCapturedDevices(
             onSuccess = { devices ->
-                // Verifica se há capturas ativas
-                val updatedDevices = devices.map { device ->
-                    if (device.capturing) {
-                        device.copy(capturing = true)  // Mantém estado ativo
-                    } else {
-                        device
+                // Ordena por timestamp decrescente e agrupa por sessão
+                val groupedDevices = devices
+                    .groupBy { it.sessionId }
+                    .flatMap { (_, sessionDevices) ->
+                        // Adiciona informação sobre o tipo de captura
+                        sessionDevices.map { device ->
+                            if (device.timeLimitMs > 0) {
+                                val hours = device.timeLimitMs / (3600 * 1000f)
+                                device.copy(name = "${device.name} (${"%.1f".format(hours)}h limit)")
+                            } else {
+                                device.copy(name = "${device.name} (${device.captureTotal} packets)")
+                            }
+                        }
                     }
-                }
-                capturedPacketsAdapter.submitList(updatedDevices)
+                    .sortedByDescending { it.lastCaptureTimestamp }
+
+                capturedPacketsAdapter.submitList(groupedDevices)
             },
             onFailure = {
-                showMessage("Failed to load capture session")
+                showMessage("Failed to load capture history")
                 finish()
             }
         )
     }
+
+
     private fun initializeToolbar() {
         val toolbar = binding.includeTbCapturedPackets.tbMain
         setSupportActionBar(toolbar)

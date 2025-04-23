@@ -21,9 +21,6 @@
         android:theme="@style/Theme.ScanIoT"
         tools:targetApi="31">
         <activity
-            android:name=".view.Login2Activity"
-            android:exported="false" />
-        <activity
             android:name=".CapturedPacketsActivity"
             android:exported="false"
             android:parentActivityName=".DashboardScreenActivity" />
@@ -41,9 +38,9 @@
         <activity
             android:name=".RegisterActivity"
             android:exported="false"
-            android:parentActivityName=".view.LoginActivity" />
+            android:parentActivityName=".LoginActivity" />
         <activity
-            android:name=".view.LoginActivity"
+            android:name=".LoginActivity"
             android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />

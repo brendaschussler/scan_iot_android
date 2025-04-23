@@ -16,7 +16,7 @@
         <ImageView
             android:id="@+id/selectedImageDevice"
             android:layout_width="271dp"
-            android:layout_height="168dp"
+            android:layout_height="143dp"
             android:layout_gravity="center_horizontal"
             android:layout_marginBottom="16dp"
             android:background="@color/white"
@@ -91,6 +91,34 @@
 
             <com.google.android.material.textfield.TextInputEditText
                 android:id="@+id/editLocation"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:textSize="20sp" />
+        </com.google.android.material.textfield.TextInputLayout>
+
+        <com.google.android.material.textfield.TextInputLayout
+            style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="8dp"
+            android:hint="Device Version">
+
+            <com.google.android.material.textfield.TextInputEditText
+                android:id="@+id/editVersion"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:textSize="20sp" />
+        </com.google.android.material.textfield.TextInputLayout>
+
+        <com.google.android.material.textfield.TextInputLayout
+            style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="8dp"
+            android:hint="Device Type">
+
+            <com.google.android.material.textfield.TextInputEditText
+                android:id="@+id/editType"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:textSize="20sp" />
