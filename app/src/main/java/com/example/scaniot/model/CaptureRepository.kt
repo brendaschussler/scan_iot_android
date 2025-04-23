@@ -9,7 +9,6 @@ object CaptureRepository {
     private val firestore by lazy { FirebaseFirestore.getInstance() }
     private val auth by lazy { FirebaseAuth.getInstance() }
 
-    // Salva uma nova captura no histórico
     fun saveNewCapture(devices: List<Device>, onComplete: (Boolean) -> Unit = {}) {
         val userId = auth.currentUser?.uid ?: run {
             onComplete(false)
@@ -19,32 +18,29 @@ object CaptureRepository {
         val timestamp = System.currentTimeMillis()
         val sessionId = firestore.collection("captured_list").document().id
 
-        val batch = firestore.batch()
-        val collectionRef = firestore.collection("captured_list")
-            .document(userId)
-            .collection("captures")
-            .document() // Gera um novo ID automático para esta sessão de captura
-
-
         val devicesMap = devices.associate { device ->
             device.mac to hashMapOf(
                 "name" to device.name,
                 "mac" to device.mac,
                 "captureTotal" to device.captureTotal,
+                "timeLimitMs" to device.timeLimitMs,  // Novo campo adicionado
                 "captureProgress" to device.captureProgress,
                 "capturing" to device.capturing,
                 "lastCaptureTimestamp" to device.lastCaptureTimestamp,
-                // Adicione outros campos necessários
                 "ip" to device.ip,
                 "vendor" to device.vendor,
                 "deviceModel" to device.deviceModel,
-                "deviceLocation" to device.deviceLocation
+                "deviceLocation" to device.deviceLocation,
+                "sessionId" to sessionId,  // Adicionando sessionId a cada dispositivo
+                "sessionTimestamp" to timestamp
             )
         }
 
         val captureSession = hashMapOf(
             "timestamp" to timestamp,
-            "devices" to devicesMap
+            "sessionId" to sessionId,
+            "devices" to devicesMap,
+            "captureType" to if (devices.any { it.timeLimitMs > 0 }) "TIME_LIMIT" else "PACKET_COUNT"  // Novo campo para tipo de captura
         )
 
         firestore.collection("captured_list")
@@ -65,20 +61,23 @@ object CaptureRepository {
         firestore.collection("captured_list")
             .document(userId)
             .collection("captures")
+            .orderBy("timestamp", Query.Direction.DESCENDING)  // Ordena por timestamp decrescente
             .get()
             .addOnSuccessListener { snapshot ->
                 val allDevices = mutableListOf<Device>()
 
                 snapshot.documents.forEach { doc ->
                     val timestamp = doc.getLong("timestamp") ?: System.currentTimeMillis()
+                    val sessionId = doc.id
                     val devicesMap = doc.get("devices") as? Map<String, Map<String, Any>> ?: emptyMap()
 
                     devicesMap.forEach { (mac, deviceData) ->
                         allDevices.add(
                             Device(
                                 name = deviceData["name"] as? String ?: "",
-                                mac = deviceData["mac"] as? String ?: "",
+                                mac = deviceData["mac"] as? String ?: mac,
                                 captureTotal = (deviceData["captureTotal"] as? Long)?.toInt() ?: 0,
+                                timeLimitMs = deviceData["timeLimitMs"] as? Long ?: 0,  // Novo campo
                                 captureProgress = (deviceData["captureProgress"] as? Long)?.toInt() ?: 0,
                                 capturing = deviceData["capturing"] as? Boolean ?: false,
                                 lastCaptureTimestamp = deviceData["lastCaptureTimestamp"] as? Long ?: timestamp,
@@ -86,10 +85,9 @@ object CaptureRepository {
                                 vendor = deviceData["vendor"] as? String ?: "",
                                 deviceModel = deviceData["deviceModel"] as? String ?: "",
                                 deviceLocation = deviceData["deviceLocation"] as? String ?: "",
-                                sessionId = doc.id,
-                                sessionTimestamp = timestamp // Adicionamos este novo campo
+                                sessionId = sessionId,
+                                sessionTimestamp = timestamp
                             )
-
                         )
                     }
                 }

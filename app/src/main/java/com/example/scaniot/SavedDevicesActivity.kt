@@ -3,8 +3,10 @@ package com.example.scaniot
 import android.app.AlertDialog
 import android.content.Intent
 import android.os.Bundle
+import android.text.InputType
 import android.view.LayoutInflater
 import android.view.View
+import android.widget.RadioGroup
 import androidx.activity.enableEdgeToEdge
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.ViewCompat
@@ -17,6 +19,7 @@ import com.example.scaniot.model.SavedDevicesAdapter
 import com.example.scaniot.utils.showMessage
 import com.example.scaniot.LoginActivity
 import com.google.android.material.textfield.TextInputEditText
+import com.google.android.material.textfield.TextInputLayout
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.storage.FirebaseStorage
@@ -81,45 +84,71 @@ class SavedDevicesActivity : AppCompatActivity() {
 
     private fun showPacketCaptureDialog() {
         val dialogView = LayoutInflater.from(this).inflate(R.layout.dialog_packet_capture, null)
-        val editPacketCount = dialogView.findViewById<TextInputEditText>(R.id.editPacketCount)
+        val radioCaptureMode = dialogView.findViewById<RadioGroup>(R.id.radioCaptureMode)
+        val layoutCaptureValue = dialogView.findViewById<TextInputLayout>(R.id.layoutCaptureValue)
+        val editCaptureValue = dialogView.findViewById<TextInputEditText>(R.id.editCaptureValue)
         val editFilename = dialogView.findViewById<TextInputEditText>(R.id.editFilename)
+
+        // Configura o listener para mudar o modo
+        radioCaptureMode.setOnCheckedChangeListener { _, checkedId ->
+            when (checkedId) {
+                R.id.radioPacketCount -> {
+                    layoutCaptureValue.hint = "Number of packets"
+                    editCaptureValue.inputType = InputType.TYPE_CLASS_NUMBER
+                    editCaptureValue.setText("100")
+                }
+                R.id.radioTimeLimit -> {
+                    layoutCaptureValue.hint = "Time limit (hours)"
+                    editCaptureValue.inputType = InputType.TYPE_CLASS_NUMBER or InputType.TYPE_NUMBER_FLAG_DECIMAL
+                    editCaptureValue.setText("3.0")
+                }
+            }
+        }
 
         AlertDialog.Builder(this)
             .setTitle("Capture Settings")
             .setView(dialogView)
             .setPositiveButton("Start Capture") { _, _ ->
-                val packetCount = editPacketCount.text.toString().toIntOrNull() ?: DEFAULT_PACKET_COUNT
                 var filename = editFilename.text.toString().trim()
-
-                // Garante que o arquivo termina com .pcap
                 if (!filename.endsWith(PCAP_EXTENSION)) {
                     filename += PCAP_EXTENSION
                 }
 
-                //startPacketCapture(packetCount, filename)
                 val selectedDevices = savedDevicesAdapter.getSelectedDevices()
-                startCapturedPacketsActivity(selectedDevices, packetCount, filename)
+
+                if (radioCaptureMode.checkedRadioButtonId == R.id.radioPacketCount) {
+                    val packetCount = editCaptureValue.text.toString().toIntOrNull()?.coerceAtLeast(1) ?: DEFAULT_PACKET_COUNT
+                    startCapturedPacketsActivity(selectedDevices, packetCount, 0, filename)
+                } else {
+                    // Converte tanto ponto quanto vírgula para double
+                    val hoursText = editCaptureValue.text.toString()
+                        .replace(',', '.') // Substitui vírgula por ponto
+                    val hours = hoursText.toDoubleOrNull()?.coerceAtLeast(0.1) ?: 3.0
+                    val milliseconds = (hours * 3600 * 1000).toLong()
+                    startCapturedPacketsActivity(selectedDevices, 0, milliseconds, filename)
+                }
             }
             .setNegativeButton("Cancel", null)
             .show()
     }
 
-    private fun startCapturedPacketsActivity(devices: List<Device>, packetCount: Int, filename: String) {
+    private fun startCapturedPacketsActivity(devices: List<Device>, packetCount: Int, timeLimitMs: Long, filename: String) {
         val devicesWithCapture = devices.map {
             it.copy(
                 capturing = true,
-                captureTotal = packetCount,
+                captureTotal = if (timeLimitMs > 0) 0 else packetCount.coerceAtLeast(1), // Garante pelo menos 1 pacote
+                timeLimitMs = timeLimitMs,
                 captureProgress = 0,
                 lastCaptureTimestamp = System.currentTimeMillis()
             )
         }
 
-        // Salva como uma nova captura no histórico
         CaptureRepository.saveNewCapture(devicesWithCapture) { success ->
             if (success) {
                 val intent = Intent(this, CapturedPacketsActivity::class.java).apply {
                     putParcelableArrayListExtra("selected_devices", ArrayList(devicesWithCapture))
                     putExtra("packet_count", packetCount)
+                    putExtra("time_limit_ms", timeLimitMs)
                     putExtra("filename", filename)
                 }
                 startActivity(intent)
@@ -128,6 +157,7 @@ class SavedDevicesActivity : AppCompatActivity() {
             }
         }
     }
+
 
 
     private fun setupRecyclerView() {

@@ -12,12 +12,36 @@
         android:layout_height="wrap_content"
         android:gravity="center_horizontal"
         android:paddingBottom="10dp"
-        android:text="Enter the number of packets you want to capture and the name of the .pcap file where these packets will be saved"
+        android:text="Configure your packet capture options"
         android:textColor="@color/OnPrimary_night_theme"
         android:textSize="20sp"
         android:textStyle="bold" />
 
+    <RadioGroup
+        android:id="@+id/radioCaptureMode"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:layout_marginBottom="16dp">
+
+        <RadioButton
+            android:id="@+id/radioPacketCount"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="By packet count"
+            android:checked="true"/>
+
+        <RadioButton
+            android:id="@+id/radioTimeLimit"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="By time limit"/>
+    </RadioGroup>
+
     <com.google.android.material.textfield.TextInputLayout
+        android:id="@+id/layoutCaptureValue"
         style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
@@ -25,7 +49,7 @@
         android:hint="Number of packets">
 
         <com.google.android.material.textfield.TextInputEditText
-            android:id="@+id/editPacketCount"
+            android:id="@+id/editCaptureValue"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:inputType="number"

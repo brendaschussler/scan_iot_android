@@ -5,7 +5,7 @@
     android:id="@+id/main"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    tools:context=".SavedDevicesActivity">
+    tools:context=".CapturedPacketsActivity">
 
     <include
         android:id="@+id/includeTbCapturedPackets"
@@ -36,25 +36,31 @@
         android:orientation="horizontal"
         app:layout_constraintGuide_percent="0.06" />
 
-    <androidx.recyclerview.widget.RecyclerView
-        android:id="@+id/rvListCapturedPackets"
+    <androidx.swiperefreshlayout.widget.SwipeRefreshLayout
+        android:id="@+id/swipeRefreshLayout"
         android:layout_width="0dp"
         android:layout_height="0dp"
         android:layout_marginStart="20dp"
         android:layout_marginTop="20dp"
         android:layout_marginEnd="20dp"
         android:layout_marginBottom="20dp"
-        android:fadeScrollbars="false"
-        android:scrollbarSize="6dp"
-        android:scrollbarStyle="outsideOverlay"
-        android:scrollbarThumbVertical="@drawable/custom_scrollbar"
-        android:scrollbarTrackVertical="@android:color/transparent"
-        android:scrollbars="vertical"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintHorizontal_bias="0.5"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toTopOf="@+id/guideline10"
-        tools:listitem="@layout/item_captured_packets" />
+        app:layout_constraintTop_toTopOf="@+id/guideline10">
+
+        <androidx.recyclerview.widget.RecyclerView
+            android:id="@+id/rvListCapturedPackets"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:fadeScrollbars="false"
+            android:scrollbarSize="6dp"
+            android:scrollbarStyle="outsideOverlay"
+            android:scrollbarThumbVertical="@drawable/custom_scrollbar"
+            android:scrollbarTrackVertical="@android:color/transparent"
+            android:scrollbars="vertical"
+            tools:listitem="@layout/item_captured_packets" />
+
+    </androidx.swiperefreshlayout.widget.SwipeRefreshLayout>
 
 </androidx.constraintlayout.widget.ConstraintLayout>
