@@ -157,9 +157,7 @@ class SavedDevicesActivity : AppCompatActivity() {
             }
         }
     }
-
-
-
+    
     private fun setupRecyclerView() {
         savedDevicesAdapter = SavedDevicesAdapter(
             onDeleteClick = { device ->
