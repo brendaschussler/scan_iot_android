@@ -89,6 +89,17 @@
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="@+id/guideline9" />
 
+    <ProgressBar
+        android:id="@+id/progressBarCircular"
+        style="?android:attr/progressBarStyle"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        app:layout_constraintBottom_toBottomOf="@+id/rvListScanDevices"
+        app:layout_constraintEnd_toEndOf="@+id/rvListScanDevices"
+        app:layout_constraintStart_toStartOf="@+id/rvListScanDevices"
+        app:layout_constraintTop_toTopOf="@+id/rvListScanDevices" />
+
+
     <!-- Novo: SearchView para filtrar dispositivos -->
 
     <!-- Lista de dispositivos -->

@@ -23,11 +23,16 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import com.example.scaniot.databinding.ActivityScanDevicesBinding
 import com.example.scaniot.helper.Permissions
 import com.example.scaniot.model.Device
+import com.example.scaniot.model.NetworkScanner
 import com.example.scaniot.model.ScanDevicesAdapter
 import com.google.android.material.textfield.TextInputEditText
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.storage.FirebaseStorage
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.io.ByteArrayOutputStream
 import java.util.UUID
 
@@ -60,7 +65,7 @@ class ScanDevicesActivity : AppCompatActivity() {
 
     val currentUserId = firebaseAuth.currentUser?.uid ?: ""
 
-    val scannedDevices = listOf(
+    /*val scannedDevices = listOf(
         Device(
             ip = "192.168.1.111",
             mac = "55:1A:2B:3C:4D:95",
@@ -121,12 +126,19 @@ class ScanDevicesActivity : AppCompatActivity() {
             deviceType = "camera",
             userId = currentUserId
         )
-    )
+    )*/
+
+    private val scannedDevices = mutableListOf<Device>()
+    private lateinit var networkScanner: NetworkScanner
 
     private val valPermissions = listOf(
         android.Manifest.permission.CAMERA,
         android.Manifest.permission.READ_EXTERNAL_STORAGE,
-        android.Manifest.permission.READ_MEDIA_IMAGES
+        android.Manifest.permission.READ_MEDIA_IMAGES,
+        android.Manifest.permission.ACCESS_WIFI_STATE,
+        android.Manifest.permission.ACCESS_NETWORK_STATE,
+        android.Manifest.permission.CHANGE_WIFI_STATE,
+        android.Manifest.permission.INTERNET
     )
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -170,6 +182,9 @@ class ScanDevicesActivity : AppCompatActivity() {
             }
         }
 
+        networkScanner = NetworkScanner(this)
+        binding.progressBarCircular.visibility = View.GONE
+
         ViewCompat.setOnApplyWindowInsetsListener(findViewById(R.id.main)) { v, insets ->
             val systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
             v.setPadding(systemBars.left, systemBars.top, systemBars.right, systemBars.bottom)
@@ -177,10 +192,48 @@ class ScanDevicesActivity : AppCompatActivity() {
         }
     }
 
-    private fun startScanningDevices() {
+    /*private fun startScanningDevices() {
         binding.btnStartScan.setOnClickListener {
             //loadDevices()
             loadDevicesWithSavedData()
+        }
+    }*/
+
+    private fun startScanningDevices() {
+        binding.btnStartScan.setOnClickListener {
+            binding.btnStartScan.isEnabled = false
+            binding.progressBarCircular.visibility = View.VISIBLE
+
+            CoroutineScope(Dispatchers.Main).launch {
+                try {
+                    val discoveredDevices = withContext(Dispatchers.IO) {
+                        networkScanner.scanNetworkDevices()
+                    }
+
+                    scannedDevices.clear()
+                    scannedDevices.addAll(discoveredDevices)
+
+                    if (scannedDevices.isEmpty()) {
+                        Toast.makeText(
+                            this@ScanDevicesActivity,
+                            "No devices found on the network",
+                            Toast.LENGTH_SHORT
+                        ).show()
+                    }
+
+                    loadDevicesWithSavedData()
+                } catch (e: Exception) {
+                    Toast.makeText(
+                        this@ScanDevicesActivity,
+                        "Scan failed: ${e.message}",
+                        Toast.LENGTH_SHORT
+                    ).show()
+                    Log.e("NetworkScan", "Error scanning network", e)
+                } finally {
+                    binding.btnStartScan.isEnabled = true
+                    binding.progressBarCircular.visibility = View.GONE
+                }
+            }
         }
     }
 
