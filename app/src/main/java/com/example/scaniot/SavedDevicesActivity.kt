@@ -7,6 +7,7 @@ import android.text.InputType
 import android.view.LayoutInflater
 import android.view.View
 import android.widget.RadioGroup
+import android.widget.Toast
 import androidx.activity.enableEdgeToEdge
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.ViewCompat
@@ -23,6 +24,7 @@ import com.google.android.material.textfield.TextInputLayout
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.storage.FirebaseStorage
+import com.example.scaniot.model.PacketCapturer
 
 class SavedDevicesActivity : AppCompatActivity() {
 
@@ -110,14 +112,15 @@ class SavedDevicesActivity : AppCompatActivity() {
             .setView(dialogView)
             .setPositiveButton("Start Capture") { _, _ ->
                 var filename = editFilename.text.toString().trim()
-                if (!filename.endsWith(PCAP_EXTENSION)) {
+                /*if (!filename.endsWith(PCAP_EXTENSION)) {
                     filename += PCAP_EXTENSION
-                }
+                }*/
 
                 val selectedDevices = savedDevicesAdapter.getSelectedDevices()
 
                 if (radioCaptureMode.checkedRadioButtonId == R.id.radioPacketCount) {
                     val packetCount = editCaptureValue.text.toString().toIntOrNull()?.coerceAtLeast(1) ?: DEFAULT_PACKET_COUNT
+                    startCapture(selectedDevices, packetCount, filename)
                     startCapturedPacketsActivity(selectedDevices, packetCount, 0, filename)
                 } else {
                     // Converte tanto ponto quanto vírgula para double
@@ -130,6 +133,63 @@ class SavedDevicesActivity : AppCompatActivity() {
             }
             .setNegativeButton("Cancel", null)
             .show()
+    }
+
+    private fun checkRootAccess(): Boolean {
+        return try {
+            // Comando que só funciona com root
+            val process = Runtime.getRuntime().exec(arrayOf("su", "-c", "id"))
+            val exitCode = process.waitFor()
+            exitCode == 0
+        } catch (e: Exception) {
+            false
+        }
+    }
+
+    private fun showRootRequiredDialog(selectedDevices: List<Device>, packetCount: Int, outputFile: String) {
+        AlertDialog.Builder(this)
+            .setTitle("Acesso Root Necessário")
+            .setMessage("Este recurso requer permissões de superusuário. Por favor, conceda o acesso root quando solicitado.")
+            .setPositiveButton("Tentar Novamente") { _, _ ->
+                if (checkRootAccess()) {
+                    startCapture(selectedDevices, packetCount, outputFile)
+                } else {
+                    showRootRequiredDialog(selectedDevices, packetCount, outputFile)
+                }
+            }
+            .setNegativeButton("Cancelar", null)
+            .setCancelable(false)
+            .show()
+    }
+
+    private fun startCapture(selectedDevices: List<Device>, packetCount: Int, outputFile: String) {
+
+        val macList = selectedDevices.map { it.mac }
+        //val packetCount = 10000
+        val outputFileName = "/sdcard/${outputFile}.pcap"
+
+        if (!checkRootAccess()) {
+            showRootRequiredDialog(selectedDevices, packetCount, outputFile)
+            return
+        }
+
+        /*val selectedDevices = savedDevicesAdapter.getSelectedDevices()
+        if (selectedDevices.isEmpty()) {
+            showMessage("Selecione dispositivos")
+            return
+        }*/
+
+
+
+        PacketCapturer(this).capture(macList, packetCount, outputFileName) { success, message ->
+            runOnUiThread {
+                if (success) {
+                    Toast.makeText(this, "Iniciando Captura", Toast.LENGTH_LONG).show()
+                } else {
+                    Toast.makeText(this, "Falha: $message", Toast.LENGTH_LONG).show()
+                }
+            }
+        }
     }
 
     private fun startCapturedPacketsActivity(devices: List<Device>, packetCount: Int, timeLimitMs: Long, filename: String) {
