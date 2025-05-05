@@ -108,19 +108,6 @@ class CapturedPacketsActivity : AppCompatActivity() {
         loadAllCapturedDevices()
     }
 
-    private fun loadCapturedDevices() {
-        val forceRefresh = intent.getBooleanExtra("force_refresh", false)
-
-        if (forceRefresh || intent.getParcelableArrayListExtra<Device>("selected_devices") == null) {
-            // Carrega todo o histórico de capturas
-            loadAllCapturedDevices()
-        } else {
-            // Usa os dispositivos do intent (quando vem da SavedDevices)
-            val devices = intent.getParcelableArrayListExtra<Device>("selected_devices")!!
-            capturedPacketsAdapter.submitList(devices)
-        }
-    }
-
     private fun loadAllCapturedDevices() {
         CaptureRepository.getAllCapturedDevices(
             onSuccess = { devices ->
