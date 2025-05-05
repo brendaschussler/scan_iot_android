@@ -9,6 +9,58 @@ object CaptureRepository {
     private val firestore by lazy { FirebaseFirestore.getInstance() }
     private val auth by lazy { FirebaseAuth.getInstance() }
 
+    fun getAllCaptureSessions(onSuccess: (List<CaptureSession>) -> Unit, onFailure: () -> Unit = {}) {
+        val userId = auth.currentUser?.uid ?: run {
+            onFailure()
+            return
+        }
+
+        firestore.collection("captured_list")
+            .document(userId)
+            .collection("captures")
+            .orderBy("timestamp", Query.Direction.DESCENDING)
+            .get()
+            .addOnSuccessListener { snapshot ->
+                val sessions = mutableListOf<CaptureSession>()
+
+                snapshot.documents.forEach { doc ->
+                    val timestamp = doc.getLong("timestamp") ?: System.currentTimeMillis()
+                    val sessionId = doc.id
+                    val captureType = doc.getString("captureType") ?: if (doc.getLong("timeLimitMs") != null) "TIME_LIMIT" else "PACKET_COUNT"
+                    val devicesMap = doc.get("devices") as? Map<String, Map<String, Any>> ?: emptyMap()
+
+                    val devices = devicesMap.map { (mac, deviceData) ->
+                        Device(
+                            name = deviceData["name"] as? String ?: "",
+                            mac = deviceData["mac"] as? String ?: mac,
+                            captureTotal = (deviceData["captureTotal"] as? Long)?.toInt() ?: 0,
+                            timeLimitMs = deviceData["timeLimitMs"] as? Long ?: 0,
+                            captureProgress = (deviceData["captureProgress"] as? Long)?.toInt() ?: 0,
+                            capturing = deviceData["capturing"] as? Boolean ?: false,
+                            lastCaptureTimestamp = deviceData["lastCaptureTimestamp"] as? Long ?: timestamp,
+                            ip = deviceData["ip"] as? String ?: "",
+                            vendor = deviceData["vendor"] as? String ?: "",
+                            deviceModel = deviceData["deviceModel"] as? String ?: "",
+                            deviceLocation = deviceData["deviceLocation"] as? String ?: "",
+                            sessionId = sessionId,
+                            sessionTimestamp = timestamp
+                        )
+                    }
+
+                    sessions.add(CaptureSession(
+                        sessionId = sessionId,
+                        timestamp = timestamp,
+                        devices = devices,
+                        captureType = captureType,
+                        isActive = devices.any { it.capturing }
+                    ))
+                }
+
+                onSuccess(sessions)
+            }
+            .addOnFailureListener { onFailure() }
+    }
+
     fun saveNewCapture(devices: List<Device>, onComplete: (Boolean) -> Unit = {}) {
         val userId = auth.currentUser?.uid ?: run {
             onComplete(false)
