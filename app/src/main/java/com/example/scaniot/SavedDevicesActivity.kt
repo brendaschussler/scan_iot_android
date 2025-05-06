@@ -29,7 +29,7 @@ import com.example.scaniot.model.PacketCapturer
 class SavedDevicesActivity : AppCompatActivity() {
 
     companion object {
-        private const val DEFAULT_PACKET_COUNT = 100
+        private const val DEFAULT_PACKET_COUNT = 1000
         private const val PCAP_EXTENSION = ".pcap"
     }
 
@@ -97,12 +97,12 @@ class SavedDevicesActivity : AppCompatActivity() {
                 R.id.radioPacketCount -> {
                     layoutCaptureValue.hint = "Number of packets"
                     editCaptureValue.inputType = InputType.TYPE_CLASS_NUMBER
-                    editCaptureValue.setText("100")
+                    editCaptureValue.setText("1000")
                 }
                 R.id.radioTimeLimit -> {
                     layoutCaptureValue.hint = "Time limit (hours)"
                     editCaptureValue.inputType = InputType.TYPE_CLASS_NUMBER or InputType.TYPE_NUMBER_FLAG_DECIMAL
-                    editCaptureValue.setText("3.0")
+                    editCaptureValue.setText("0.5")
                 }
             }
         }
@@ -125,7 +125,7 @@ class SavedDevicesActivity : AppCompatActivity() {
                     // Converte tanto ponto quanto vírgula para double
                     val hoursText = editCaptureValue.text.toString()
                         .replace(',', '.') // Substitui vírgula por ponto
-                    val hours = hoursText.toDoubleOrNull()?.coerceAtLeast(0.1) ?: 3.0
+                    val hours = hoursText.toDoubleOrNull()?.coerceAtLeast(0.1) ?: 0.5
                     val milliseconds = (hours * 3600 * 1000).toLong()
                     startCapturedPacketsActivity(selectedDevices, 0, milliseconds, filename)
                 }
@@ -145,7 +145,7 @@ class SavedDevicesActivity : AppCompatActivity() {
             )
         }
 
-        CaptureRepository.saveNewCapture(this, devicesWithCapture, devices, packetCount, filename) { success ->
+        CaptureRepository.saveNewCapture(this, devicesWithCapture, devices, packetCount, timeLimitMs, filename) { success ->
             if (success) {
                 val intent = Intent(this, CapturedPacketsActivity::class.java).apply {
                     putParcelableArrayListExtra("selected_devices", ArrayList(devicesWithCapture))

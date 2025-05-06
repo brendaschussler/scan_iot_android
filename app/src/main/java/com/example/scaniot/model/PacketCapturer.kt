@@ -12,6 +12,8 @@ import androidx.appcompat.app.AppCompatActivity
 import java.io.DataOutputStream
 import java.net.InetAddress
 import java.net.NetworkInterface
+import java.util.Timer
+import java.util.TimerTask
 import kotlin.collections.iterator
 
 class PacketCapturer(private val context: Context) {
@@ -60,6 +62,64 @@ class PacketCapturer(private val context: Context) {
                             }
                         }
                     }.start()
+
+                    val exitCode = process.waitFor()
+                    callback(exitCode == 0, outputFile)
+                } else {
+                    callback(false, "IP não encontrado")
+                }
+            } catch (e: Exception) {
+                callback(false, "Erro: ${e.message}")
+            }
+        }.start()
+    }
+
+    fun captureByTime(macList: List<String>, timeLimit: Long, outputFile: String, callback: (Boolean, String) -> Unit) {
+
+        Thread {
+            try {
+                val process = Runtime.getRuntime().exec("su")
+                val outputStream = DataOutputStream(process.outputStream)
+
+                val filter = macList.joinToString(" or ") { "ether host $it" }
+                val localIp = getActiveIpAddress()
+                Log.d("TCPDUMP", "LocalIp: $localIp")
+
+                if (localIp != null) {
+                    val networkPrefix = getNetworkPrefix(localIp)
+                    Log.d("TCPDUMP", "NetworkPrefix: $networkPrefix")
+                    val cmdIp = "ip -o addr show | grep $networkPrefix"
+                    val process = Runtime.getRuntime().exec(arrayOf("su", "-c", cmdIp))
+                    val reader = process.inputStream.bufferedReader()
+                    val output = reader.readText()
+                    process.waitFor()
+
+                    val interfaceName = Regex("""^\d+:\s+(\S+)""").find(output)?.groupValues?.get(1)
+
+                    val command = "tcpdump -i $interfaceName $filter -s 0 -w $outputFile\n"
+
+                    Log.d("TCPDUMP", "Executando: $command")
+
+                    outputStream.writeBytes(command)
+                    outputStream.writeBytes("exit\n")
+                    outputStream.flush()
+
+                    Timer().schedule(object : TimerTask() {
+                        override fun run() {
+                            try {
+                                outputStream.writeBytes("pkill -SIGINT tcpdump\n")
+                                outputStream.writeBytes("exit\n")
+                                outputStream.flush()
+                            } catch (e: Exception) {
+                                Log.e("TCPDUMP", "Erro ao encerrar tcpdump", e)
+                            }
+                        }
+                    }, timeLimit)
+
+                    for (i in 1..timeLimit) {
+                        Thread.sleep(1000)
+                        val elapsedTime = i
+                    }
 
                     val exitCode = process.waitFor()
                     callback(exitCode == 0, outputFile)

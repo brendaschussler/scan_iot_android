@@ -64,8 +64,13 @@ object CaptureRepository {
             .addOnFailureListener { onFailure() }
     }
 
-    fun saveNewCapture(context: Context, devices: List<Device>, selectedDevices: List<Device>, packetCount: Int, filename : String, onComplete: (Boolean) -> Unit = {}) {
-        startCapture(context, selectedDevices, packetCount, filename)
+    fun saveNewCapture(context: Context, devices: List<Device>, selectedDevices: List<Device>, packetCount: Int, timeLimitMs: Long, filename : String, onComplete: (Boolean) -> Unit = {}) {
+
+        if (timeLimitMs > 0){
+            startCaptureTime(context, selectedDevices, timeLimitMs, filename)
+        }else {
+            startCapture(context, selectedDevices, packetCount, filename)
+        }
 
         val userId = auth.currentUser?.uid ?: run {
             onComplete(false)
@@ -109,6 +114,50 @@ object CaptureRepository {
             .addOnFailureListener { onComplete(false) }
     }
 
+    private fun startCaptureTime(
+        context: Context,
+        selectedDevices: List<Device>,
+        timeLimit: Long,
+        outputFile: String
+    ) {
+        val macList = selectedDevices.map { it.mac }
+        val outputFileName = "/sdcard/${outputFile}.pcap"
+
+        if (!checkRootAccess()) {
+            showRootRequiredDialogTime(context, selectedDevices, timeLimit, outputFile)
+            return
+        }
+
+        PacketCapturer(context).captureByTime(macList, timeLimit, outputFileName) { success, message ->
+            if (success)  {
+                Log.d("OK", "Success, iniciando captura")
+            } else {
+                Log.d("OK", "error")
+            }
+        }
+    }
+
+    private fun showRootRequiredDialogTime(
+        context: Context,
+        selectedDevices: List<Device>,
+        timeLimit: Long,
+        outputFile: String
+    ) {
+        AlertDialog.Builder(context)
+            .setTitle("Acesso Root Necessário")
+            .setMessage("Este recurso requer permissões de superusuário. Por favor, conceda o acesso root quando solicitado.")
+            .setPositiveButton("Tentar Novamente") { _, _ ->
+                if (checkRootAccess()) {
+                    startCaptureTime(context, selectedDevices, timeLimit, outputFile)
+                } else {
+                    showRootRequiredDialogTime(context, selectedDevices, timeLimit, outputFile)
+                }
+            }
+            .setNegativeButton("Cancelar", null)
+            .setCancelable(false)
+            .show()
+    }
+
     private fun checkRootAccess(): Boolean {
         return try {
             val process = Runtime.getRuntime().exec(arrayOf("su", "-c", "id"))
@@ -146,12 +195,6 @@ object CaptureRepository {
             return
         }
 
-        /*val selectedDevices = savedDevicesAdapter.getSelectedDevices()
-        if (selectedDevices.isEmpty()) {
-            showMessage("Selecione dispositivos")
-            return
-        }*/
-
         PacketCapturer(context).capture(macList, packetCount, outputFileName) { success, message ->
             if (success)  {
                 Log.d("OK", "Success, iniciando captura")
@@ -161,25 +204,6 @@ object CaptureRepository {
         }
     }
 
-
-
-    // Atualiza o progresso em uma captura específica
-    fun updateCaptureProgress(sessionId: String, device: Device, progress: Int, total: Int) {
-        val userId = auth.currentUser?.uid ?: return
-
-        val devicePath = "devices.${device.mac}"
-
-        firestore.collection("captured_list")
-            .document(userId)
-            .collection("captures")
-            .document(sessionId)
-            .update(
-                "$devicePath.capturing", progress < total,
-                "$devicePath.captureProgress", progress,
-                "$devicePath.captureTotal", total,
-                "$devicePath.lastCaptureTimestamp", System.currentTimeMillis()
-            )
-    }
 
     fun deleteCaptureSession(sessionId: String, onComplete: (Boolean) -> Unit) {
         val userId = auth.currentUser?.uid ?: run {
