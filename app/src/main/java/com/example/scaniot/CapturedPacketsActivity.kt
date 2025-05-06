@@ -29,9 +29,6 @@ class CapturedPacketsActivity : AppCompatActivity() {
         FirebaseAuth.getInstance()
     }
 
-    private val updateHandler = Handler(Looper.getMainLooper())
-    private val updateInterval = 2000L // 2 segundos
-
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()

@@ -1,7 +1,6 @@
 // CapturedPacketsAdapter.kt
 package com.example.scaniot.model
 
-import android.animation.ObjectAnimator
 import android.app.AlertDialog
 import android.view.LayoutInflater
 import android.view.View
@@ -9,7 +8,6 @@ import android.view.ViewGroup
 import androidx.recyclerview.widget.ListAdapter
 import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.RecyclerView
-import com.example.scaniot.R
 import com.example.scaniot.databinding.ItemCapturedSessionBinding
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -47,10 +45,6 @@ class CapturedPacketsAdapter : ListAdapter<CaptureSession, CapturedPacketsAdapte
 
                 // Configuração do status
                 txtSessionStatus.text = if (session.isActive) "Active" else "Completed"
-                /*txtSessionStatus.setTextColor(
-                    if (session.isActive) root.context.getColor(R.color.green)
-                    else root.context.getColor(R.color.red)
-                )*/
 
                 // Botões de ação
                 btnStopSession.visibility = if (session.isActive) View.VISIBLE else View.GONE
@@ -69,9 +63,10 @@ class CapturedPacketsAdapter : ListAdapter<CaptureSession, CapturedPacketsAdapte
                     session.devices.forEach { device ->
                         if (device.capturing) {
                             CaptureRepository.updateCaptureState(session.sessionId, device, false)
+                            binding.txtSessionStatus.text = "Stopped"
                         }
                     }
-                    // Atualiza a UI
+                    // Update UI
                     val updatedSession = session.copy(isActive = false)
                     val newList = currentList.toMutableList().apply {
                         set(adapterPosition, updatedSession)
@@ -100,9 +95,6 @@ class CapturedPacketsAdapter : ListAdapter<CaptureSession, CapturedPacketsAdapte
         }
 
         private fun viewDevices(session: CaptureSession) {
-            // Aqui você pode implementar a navegação para uma tela de detalhes
-            // ou mostrar um diálogo com a lista de dispositivos
-            // Exemplo simples:
             val devicesList = session.devices.joinToString("\n") { "${it.name} (${it.mac})" }
 
             AlertDialog.Builder(binding.root.context)

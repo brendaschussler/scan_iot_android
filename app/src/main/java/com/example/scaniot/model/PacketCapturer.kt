@@ -5,6 +5,7 @@ import android.os.Bundle
 import android.util.Log
 import android.widget.Button
 import android.widget.EditText
+import android.widget.ProgressBar
 import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
@@ -16,20 +17,11 @@ import kotlin.collections.iterator
 class PacketCapturer(private val context: Context) {
 
     fun capture(macList: List<String>, packetCount: Int, outputFile: String, callback: (Boolean, String) -> Unit) {
-        //val packetCount = 100
-        val timestamp = System.currentTimeMillis()
-        //val outputFile = "/sdcard/${timestamp}.pcap"
 
         Thread {
             try {
                 val process = Runtime.getRuntime().exec("su")
                 val outputStream = DataOutputStream(process.outputStream)
-
-                /*val macList = listOf(
-                    "52:2b:89:06:24:1b",
-                    "12:af:f0:62:43:f5",
-                    "8a:62:69:a1:5f:b8"
-                )*/
 
                 val filter = macList.joinToString(" or ") { "ether host $it" }
                 val localIp = getActiveIpAddress()
@@ -46,13 +38,28 @@ class PacketCapturer(private val context: Context) {
 
                     val interfaceName = Regex("""^\d+:\s+(\S+)""").find(output)?.groupValues?.get(1)
 
-                    val command = "tcpdump -i $interfaceName $filter -s 0 -c $packetCount -w $outputFile\n"
+                    val command = "tcpdump -i $interfaceName $filter -s 0 -c $packetCount -v -w $outputFile\n"
 
                     Log.d("TCPDUMP", "Executando: $command")
 
                     outputStream.writeBytes(command)
                     outputStream.writeBytes("exit\n")
                     outputStream.flush()
+
+                    // Thread para ler o progresso
+                    Thread {
+                        val errorReader = process.errorStream.bufferedReader()
+                        var line: String?
+                        val regex = Regex("""Got (\d+)""")
+
+                        while (errorReader.readLine().also { line = it } != null) {
+                            line?.let { logLine ->
+                                regex.find(logLine)?.groupValues?.get(1)?.toIntOrNull()?.let { count ->
+                                    Log.d("COUNT", "packets: $count")
+                                }
+                            }
+                        }
+                    }.start()
 
                     val exitCode = process.waitFor()
                     callback(exitCode == 0, outputFile)

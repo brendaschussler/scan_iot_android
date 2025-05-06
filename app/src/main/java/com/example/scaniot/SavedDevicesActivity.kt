@@ -120,7 +120,6 @@ class SavedDevicesActivity : AppCompatActivity() {
 
                 if (radioCaptureMode.checkedRadioButtonId == R.id.radioPacketCount) {
                     val packetCount = editCaptureValue.text.toString().toIntOrNull()?.coerceAtLeast(1) ?: DEFAULT_PACKET_COUNT
-                    startCapture(selectedDevices, packetCount, filename)
                     startCapturedPacketsActivity(selectedDevices, packetCount, 0, filename)
                 } else {
                     // Converte tanto ponto quanto vírgula para double
@@ -135,63 +134,6 @@ class SavedDevicesActivity : AppCompatActivity() {
             .show()
     }
 
-    private fun checkRootAccess(): Boolean {
-        return try {
-            // Comando que só funciona com root
-            val process = Runtime.getRuntime().exec(arrayOf("su", "-c", "id"))
-            val exitCode = process.waitFor()
-            exitCode == 0
-        } catch (e: Exception) {
-            false
-        }
-    }
-
-    private fun showRootRequiredDialog(selectedDevices: List<Device>, packetCount: Int, outputFile: String) {
-        AlertDialog.Builder(this)
-            .setTitle("Acesso Root Necessário")
-            .setMessage("Este recurso requer permissões de superusuário. Por favor, conceda o acesso root quando solicitado.")
-            .setPositiveButton("Tentar Novamente") { _, _ ->
-                if (checkRootAccess()) {
-                    startCapture(selectedDevices, packetCount, outputFile)
-                } else {
-                    showRootRequiredDialog(selectedDevices, packetCount, outputFile)
-                }
-            }
-            .setNegativeButton("Cancelar", null)
-            .setCancelable(false)
-            .show()
-    }
-
-    private fun startCapture(selectedDevices: List<Device>, packetCount: Int, outputFile: String) {
-
-        val macList = selectedDevices.map { it.mac }
-        //val packetCount = 10000
-        val outputFileName = "/sdcard/${outputFile}.pcap"
-
-        if (!checkRootAccess()) {
-            showRootRequiredDialog(selectedDevices, packetCount, outputFile)
-            return
-        }
-
-        /*val selectedDevices = savedDevicesAdapter.getSelectedDevices()
-        if (selectedDevices.isEmpty()) {
-            showMessage("Selecione dispositivos")
-            return
-        }*/
-
-
-
-        PacketCapturer(this).capture(macList, packetCount, outputFileName) { success, message ->
-            runOnUiThread {
-                if (success) {
-                    Toast.makeText(this, "Iniciando Captura", Toast.LENGTH_LONG).show()
-                } else {
-                    Toast.makeText(this, "Falha: $message", Toast.LENGTH_LONG).show()
-                }
-            }
-        }
-    }
-
     private fun startCapturedPacketsActivity(devices: List<Device>, packetCount: Int, timeLimitMs: Long, filename: String) {
         val devicesWithCapture = devices.map {
             it.copy(
@@ -203,7 +145,7 @@ class SavedDevicesActivity : AppCompatActivity() {
             )
         }
 
-        CaptureRepository.saveNewCapture(devicesWithCapture) { success ->
+        CaptureRepository.saveNewCapture(this, devicesWithCapture, devices, packetCount, filename) { success ->
             if (success) {
                 val intent = Intent(this, CapturedPacketsActivity::class.java).apply {
                     putParcelableArrayListExtra("selected_devices", ArrayList(devicesWithCapture))

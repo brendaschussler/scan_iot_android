@@ -1,7 +1,10 @@
 package com.example.scaniot.model
 
+import android.app.AlertDialog
+import android.content.Context
+import android.util.Log
+import android.widget.Toast
 import com.google.firebase.auth.FirebaseAuth
-import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.Query
 
@@ -61,7 +64,9 @@ object CaptureRepository {
             .addOnFailureListener { onFailure() }
     }
 
-    fun saveNewCapture(devices: List<Device>, onComplete: (Boolean) -> Unit = {}) {
+    fun saveNewCapture(context: Context, devices: List<Device>, selectedDevices: List<Device>, packetCount: Int, filename : String, onComplete: (Boolean) -> Unit = {}) {
+        startCapture(context, selectedDevices, packetCount, filename)
+
         val userId = auth.currentUser?.uid ?: run {
             onComplete(false)
             return
@@ -104,50 +109,58 @@ object CaptureRepository {
             .addOnFailureListener { onComplete(false) }
     }
 
-    fun getAllCapturedDevices(onSuccess: (List<Device>) -> Unit, onFailure: () -> Unit = {}) {
-        val userId = auth.currentUser?.uid ?: run {
-            onFailure()
+    private fun checkRootAccess(): Boolean {
+        return try {
+            val process = Runtime.getRuntime().exec(arrayOf("su", "-c", "id"))
+            val exitCode = process.waitFor()
+            exitCode == 0
+        } catch (e: Exception) {
+            false
+        }
+    }
+
+    private fun showRootRequiredDialog(context: Context, selectedDevices: List<Device>, packetCount: Int, outputFile: String) {
+        AlertDialog.Builder(context)
+            .setTitle("Acesso Root Necessário")
+            .setMessage("Este recurso requer permissões de superusuário. Por favor, conceda o acesso root quando solicitado.")
+            .setPositiveButton("Tentar Novamente") { _, _ ->
+                if (checkRootAccess()) {
+                    startCapture(context, selectedDevices, packetCount, outputFile)
+                } else {
+                    showRootRequiredDialog(context, selectedDevices, packetCount, outputFile)
+                }
+            }
+            .setNegativeButton("Cancelar", null)
+            .setCancelable(false)
+            .show()
+    }
+
+    private fun startCapture(context: Context, selectedDevices: List<Device>, packetCount: Int, outputFile: String) {
+
+        val macList = selectedDevices.map { it.mac }
+        //val packetCount = 10000
+        val outputFileName = "/sdcard/${outputFile}.pcap"
+
+        if (!checkRootAccess()) {
+            showRootRequiredDialog(context, selectedDevices, packetCount, outputFile)
             return
         }
 
-        firestore.collection("captured_list")
-            .document(userId)
-            .collection("captures")
-            .orderBy("timestamp", Query.Direction.DESCENDING)  // Ordena por timestamp decrescente
-            .get()
-            .addOnSuccessListener { snapshot ->
-                val allDevices = mutableListOf<Device>()
+        /*val selectedDevices = savedDevicesAdapter.getSelectedDevices()
+        if (selectedDevices.isEmpty()) {
+            showMessage("Selecione dispositivos")
+            return
+        }*/
 
-                snapshot.documents.forEach { doc ->
-                    val timestamp = doc.getLong("timestamp") ?: System.currentTimeMillis()
-                    val sessionId = doc.id
-                    val devicesMap = doc.get("devices") as? Map<String, Map<String, Any>> ?: emptyMap()
-
-                    devicesMap.forEach { (mac, deviceData) ->
-                        allDevices.add(
-                            Device(
-                                name = deviceData["name"] as? String ?: "",
-                                mac = deviceData["mac"] as? String ?: mac,
-                                captureTotal = (deviceData["captureTotal"] as? Long)?.toInt() ?: 0,
-                                timeLimitMs = deviceData["timeLimitMs"] as? Long ?: 0,  // Novo campo
-                                captureProgress = (deviceData["captureProgress"] as? Long)?.toInt() ?: 0,
-                                capturing = deviceData["capturing"] as? Boolean ?: false,
-                                lastCaptureTimestamp = deviceData["lastCaptureTimestamp"] as? Long ?: timestamp,
-                                ip = deviceData["ip"] as? String ?: "",
-                                vendor = deviceData["vendor"] as? String ?: "",
-                                deviceModel = deviceData["deviceModel"] as? String ?: "",
-                                deviceLocation = deviceData["deviceLocation"] as? String ?: "",
-                                sessionId = sessionId,
-                                sessionTimestamp = timestamp
-                            )
-                        )
-                    }
-                }
-
-                onSuccess(allDevices)
+        PacketCapturer(context).capture(macList, packetCount, outputFileName) { success, message ->
+            if (success)  {
+                Log.d("OK", "Success, iniciando captura")
+            } else {
+                Log.d("OK", "error")
             }
-            .addOnFailureListener { onFailure() }
+        }
     }
+
 
 
     // Atualiza o progresso em uma captura específica
@@ -179,21 +192,6 @@ object CaptureRepository {
             .collection("captures")
             .document(sessionId)
             .delete()
-            .addOnSuccessListener { onComplete(true) }
-            .addOnFailureListener { onComplete(false) }
-    }
-
-    fun deleteDeviceFromCapture(sessionId: String, deviceMac: String, onComplete: (Boolean) -> Unit) {
-        val userId = auth.currentUser?.uid ?: run {
-            onComplete(false)
-            return
-        }
-
-        firestore.collection("captured_list")
-            .document(userId)
-            .collection("captures")
-            .document(sessionId)
-            .update("devices.$deviceMac", FieldValue.delete())
             .addOnSuccessListener { onComplete(true) }
             .addOnFailureListener { onComplete(false) }
     }
