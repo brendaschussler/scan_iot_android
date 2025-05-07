@@ -54,12 +54,31 @@ class CapturedPacketsAdapter : ListAdapter<CaptureSession, CapturedPacketsAdapte
             }
         }
 
+        private fun sessionEnd(session: CaptureSession) {
+            session.devices.forEach { device ->
+                if (device.capturing) {
+                    CaptureRepository.updateCaptureState(session.sessionId, device, false)
+                    binding.txtSessionStatus.text = "Stopped"
+                }
+            }
+            // Update UI
+            val updatedSession = session.copy(isActive = false)
+            val newList = currentList.toMutableList().apply {
+                set(adapterPosition, updatedSession)
+            }
+            submitList(newList)
+        }
+
         private fun stopSession(session: CaptureSession) {
             AlertDialog.Builder(binding.root.context)
                 .setTitle("Stop Session")
                 .setMessage("Stop this capture session?")
                 .setNegativeButton("Cancel") { dialog, _ -> dialog.dismiss() }
                 .setPositiveButton("Stop") { _, _ ->
+
+                    val packetCapturer = PacketCapturer(binding.root.context)
+                    packetCapturer.stopCapture(session.sessionId)
+
                     session.devices.forEach { device ->
                         if (device.capturing) {
                             CaptureRepository.updateCaptureState(session.sessionId, device, false)

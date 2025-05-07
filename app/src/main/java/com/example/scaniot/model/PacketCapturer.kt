@@ -18,7 +18,7 @@ import kotlin.collections.iterator
 
 class PacketCapturer(private val context: Context) {
 
-    fun capture(macList: List<String>, packetCount: Int, outputFile: String, callback: (Boolean, String) -> Unit) {
+    fun capture(macList: List<String>, packetCount: Int, outputFile: String, sessionId: String, callback: (Boolean, String) -> Unit) {
 
         Thread {
             try {
@@ -40,7 +40,9 @@ class PacketCapturer(private val context: Context) {
 
                     val interfaceName = Regex("""^\d+:\s+(\S+)""").find(output)?.groupValues?.get(1)
 
-                    val command = "tcpdump -i $interfaceName $filter -s 0 -c $packetCount -v -w $outputFile\n"
+                    val outputFileName = "/sdcard/${outputFile}_${sessionId}.pcap"
+
+                    val command = "tcpdump -i $interfaceName $filter -s 0 -c $packetCount -v -w $outputFileName\n"
 
                     Log.d("TCPDUMP", "Executando: $command")
 
@@ -74,7 +76,7 @@ class PacketCapturer(private val context: Context) {
         }.start()
     }
 
-    fun captureByTime(macList: List<String>, timeLimit: Long, outputFile: String, callback: (Boolean, String) -> Unit) {
+    fun captureByTime(macList: List<String>, timeLimit: Long, outputFile: String, sessionId: String, callback: (Boolean, String) -> Unit) {
 
         Thread {
             try {
@@ -95,8 +97,11 @@ class PacketCapturer(private val context: Context) {
                     process.waitFor()
 
                     val interfaceName = Regex("""^\d+:\s+(\S+)""").find(output)?.groupValues?.get(1)
+                    val timeSeconds = timeLimit / 1000
+                    val outputFileName = "/sdcard/${outputFile}_${sessionId}.pcap"
 
-                    val command = "tcpdump -i $interfaceName $filter -s 0 -w $outputFile\n"
+                    //MINIMO É 360s
+                    val command = "timeout ${timeSeconds}s tcpdump -i $interfaceName $filter -s 0 -w $outputFileName\n"
 
                     Log.d("TCPDUMP", "Executando: $command")
 
@@ -107,9 +112,7 @@ class PacketCapturer(private val context: Context) {
                     Timer().schedule(object : TimerTask() {
                         override fun run() {
                             try {
-                                outputStream.writeBytes("pkill -SIGINT tcpdump\n")
-                                outputStream.writeBytes("exit\n")
-                                outputStream.flush()
+                                stopCapture(sessionId)
                             } catch (e: Exception) {
                                 Log.e("TCPDUMP", "Erro ao encerrar tcpdump", e)
                             }
@@ -155,5 +158,28 @@ class PacketCapturer(private val context: Context) {
     private fun getNetworkPrefix(ipAddress: String): String {
         val parts = ipAddress.split(".")
         return if (parts.size == 4) "${parts[0]}.${parts[1]}.${parts[2]}." else "192.168.43." // hotspot padrão
+    }
+
+    fun stopCapture(sessionId: String): Boolean {
+        return try {
+
+            val killProcess = Runtime.getRuntime().exec("su")
+            val killOutputStream = DataOutputStream(killProcess.outputStream)
+
+            killOutputStream.writeBytes("pkill -SIGINT -f \"tcpdump.*$sessionId\"\n")
+            killOutputStream.writeBytes("exit\n")
+            killOutputStream.flush()
+
+            killProcess.waitFor()
+
+            true
+
+        } catch (e: Exception) {
+            Log.e("TCPDUMP", "Error stopping tcpdump for session $sessionId", e)
+            false
+        }
+
+
+
     }
 }

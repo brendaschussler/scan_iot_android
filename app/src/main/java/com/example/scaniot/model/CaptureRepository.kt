@@ -66,12 +66,6 @@ object CaptureRepository {
 
     fun saveNewCapture(context: Context, devices: List<Device>, selectedDevices: List<Device>, packetCount: Int, timeLimitMs: Long, filename : String, onComplete: (Boolean) -> Unit = {}) {
 
-        if (timeLimitMs > 0){
-            startCaptureTime(context, selectedDevices, timeLimitMs, filename)
-        }else {
-            startCapture(context, selectedDevices, packetCount, filename)
-        }
-
         val userId = auth.currentUser?.uid ?: run {
             onComplete(false)
             return
@@ -79,6 +73,12 @@ object CaptureRepository {
 
         val timestamp = System.currentTimeMillis()
         val sessionId = firestore.collection("captured_list").document().id
+
+        if (timeLimitMs > 0){
+            startCaptureTime(context, selectedDevices, timeLimitMs, filename, sessionId)
+        }else {
+            startCapture(context, selectedDevices, packetCount, filename, sessionId)
+        }
 
         val devicesMap = devices.associate { device ->
             device.mac to hashMapOf(
@@ -118,17 +118,18 @@ object CaptureRepository {
         context: Context,
         selectedDevices: List<Device>,
         timeLimit: Long,
-        outputFile: String
+        outputFile: String,
+        sessionId: String
     ) {
         val macList = selectedDevices.map { it.mac }
-        val outputFileName = "/sdcard/${outputFile}.pcap"
+
 
         if (!checkRootAccess()) {
-            showRootRequiredDialogTime(context, selectedDevices, timeLimit, outputFile)
+            showRootRequiredDialogTime(context, selectedDevices, timeLimit, outputFile, sessionId)
             return
         }
 
-        PacketCapturer(context).captureByTime(macList, timeLimit, outputFileName) { success, message ->
+        PacketCapturer(context).captureByTime(macList, timeLimit, outputFile, sessionId) { success, message ->
             if (success)  {
                 Log.d("OK", "Success, iniciando captura")
             } else {
@@ -141,16 +142,17 @@ object CaptureRepository {
         context: Context,
         selectedDevices: List<Device>,
         timeLimit: Long,
-        outputFile: String
+        outputFile: String,
+        sessionId: String
     ) {
         AlertDialog.Builder(context)
             .setTitle("Acesso Root Necessário")
             .setMessage("Este recurso requer permissões de superusuário. Por favor, conceda o acesso root quando solicitado.")
             .setPositiveButton("Tentar Novamente") { _, _ ->
                 if (checkRootAccess()) {
-                    startCaptureTime(context, selectedDevices, timeLimit, outputFile)
+                    startCaptureTime(context, selectedDevices, timeLimit, outputFile, sessionId)
                 } else {
-                    showRootRequiredDialogTime(context, selectedDevices, timeLimit, outputFile)
+                    showRootRequiredDialogTime(context, selectedDevices, timeLimit, outputFile, sessionId)
                 }
             }
             .setNegativeButton("Cancelar", null)
@@ -168,15 +170,15 @@ object CaptureRepository {
         }
     }
 
-    private fun showRootRequiredDialog(context: Context, selectedDevices: List<Device>, packetCount: Int, outputFile: String) {
+    private fun showRootRequiredDialog(context: Context, selectedDevices: List<Device>, packetCount: Int, outputFile: String, sessionId: String) {
         AlertDialog.Builder(context)
             .setTitle("Acesso Root Necessário")
             .setMessage("Este recurso requer permissões de superusuário. Por favor, conceda o acesso root quando solicitado.")
             .setPositiveButton("Tentar Novamente") { _, _ ->
                 if (checkRootAccess()) {
-                    startCapture(context, selectedDevices, packetCount, outputFile)
+                    startCapture(context, selectedDevices, packetCount, outputFile, sessionId)
                 } else {
-                    showRootRequiredDialog(context, selectedDevices, packetCount, outputFile)
+                    showRootRequiredDialog(context, selectedDevices, packetCount, outputFile, sessionId)
                 }
             }
             .setNegativeButton("Cancelar", null)
@@ -184,18 +186,16 @@ object CaptureRepository {
             .show()
     }
 
-    private fun startCapture(context: Context, selectedDevices: List<Device>, packetCount: Int, outputFile: String) {
+    private fun startCapture(context: Context, selectedDevices: List<Device>, packetCount: Int, outputFile: String, sessionId: String) {
 
         val macList = selectedDevices.map { it.mac }
-        //val packetCount = 10000
-        val outputFileName = "/sdcard/${outputFile}.pcap"
 
         if (!checkRootAccess()) {
-            showRootRequiredDialog(context, selectedDevices, packetCount, outputFile)
+            showRootRequiredDialog(context, selectedDevices, packetCount, outputFile, sessionId)
             return
         }
 
-        PacketCapturer(context).capture(macList, packetCount, outputFileName) { success, message ->
+        PacketCapturer(context).capture(macList, packetCount, outputFile, sessionId) { success, message ->
             if (success)  {
                 Log.d("OK", "Success, iniciando captura")
             } else {
@@ -203,7 +203,6 @@ object CaptureRepository {
             }
         }
     }
-
 
     fun deleteCaptureSession(sessionId: String, onComplete: (Boolean) -> Unit) {
         val userId = auth.currentUser?.uid ?: run {
