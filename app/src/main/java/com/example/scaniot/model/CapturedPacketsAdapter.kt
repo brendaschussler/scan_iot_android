@@ -44,7 +44,11 @@ class CapturedPacketsAdapter : ListAdapter<CaptureSession, CapturedPacketsAdapte
                 txtCaptureType.text = "Type: ${session.captureType.replace("_", " ")}"
 
                 // Configuração do status
-                txtSessionStatus.text = if (session.isActive) "Active" else "Completed"
+                txtSessionStatus.text = if (session.isActive) {
+                    "Active (${session.captureProgress}/${session.captureTotal})"
+                } else {
+                    "Completed"
+                }
 
                 // Botões de ação
                 btnStopSession.visibility = if (session.isActive) View.VISIBLE else View.GONE
@@ -52,21 +56,6 @@ class CapturedPacketsAdapter : ListAdapter<CaptureSession, CapturedPacketsAdapte
                 btnDeleteSession.setOnClickListener { deleteSession(session) }
                 btnViewDevices.setOnClickListener { viewDevices(session) }
             }
-        }
-
-        private fun sessionEnd(session: CaptureSession) {
-            session.devices.forEach { device ->
-                if (device.capturing) {
-                    CaptureRepository.updateCaptureState(session.sessionId, device, false)
-                    binding.txtSessionStatus.text = "Stopped"
-                }
-            }
-            // Update UI
-            val updatedSession = session.copy(isActive = false)
-            val newList = currentList.toMutableList().apply {
-                set(adapterPosition, updatedSession)
-            }
-            submitList(newList)
         }
 
         private fun stopSession(session: CaptureSession) {
@@ -79,12 +68,8 @@ class CapturedPacketsAdapter : ListAdapter<CaptureSession, CapturedPacketsAdapte
                     val packetCapturer = PacketCapturer(binding.root.context)
                     packetCapturer.stopCapture(session.sessionId)
 
-                    session.devices.forEach { device ->
-                        if (device.capturing) {
-                            CaptureRepository.updateCaptureState(session.sessionId, device, false)
-                            binding.txtSessionStatus.text = "Stopped"
-                        }
-                    }
+                    CaptureRepository.updateCaptureState(session.sessionId, false)
+
                     // Update UI
                     val updatedSession = session.copy(isActive = false)
                     val newList = currentList.toMutableList().apply {

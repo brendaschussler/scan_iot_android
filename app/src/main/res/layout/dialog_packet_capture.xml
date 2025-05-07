@@ -68,7 +68,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:inputType="text"
-            android:text="capture_${System.currentTimeMillis()}.pcap"
+            android:text="captureSession"
             android:textSize="20sp" />
     </com.google.android.material.textfield.TextInputLayout>
 </LinearLayout>

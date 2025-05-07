@@ -32,13 +32,16 @@ class PacketCapturer(private val context: Context) {
                 if (localIp != null) {
                     val networkPrefix = getNetworkPrefix(localIp)
                     Log.d("TCPDUMP", "NetworkPrefix: $networkPrefix")
-                    val cmdIp = "ip -o addr show | grep $networkPrefix"
-                    val process = Runtime.getRuntime().exec(arrayOf("su", "-c", cmdIp))
-                    val reader = process.inputStream.bufferedReader()
-                    val output = reader.readText()
-                    process.waitFor()
 
-                    val interfaceName = Regex("""^\d+:\s+(\S+)""").find(output)?.groupValues?.get(1)
+                    // Processo secundário (para obter interface) - use outro nome de variável
+                    val interfaceProcess = Runtime.getRuntime().exec(arrayOf("su", "-c", "ip -o addr show | grep $networkPrefix"))
+                    val interfaceName = interfaceProcess.inputStream.bufferedReader().use { reader ->
+                        Regex("""^\d+:\s+(\S+)""").find(reader.readText())?.groupValues?.get(1)
+                    }
+                    interfaceProcess.waitFor()
+
+
+                    //val interfaceName = Regex("""^\d+:\s+(\S+)""").find(output)?.groupValues?.get(1)
 
                     val outputFileName = "/sdcard/${outputFile}_${sessionId}.pcap"
 
@@ -52,16 +55,31 @@ class PacketCapturer(private val context: Context) {
 
                     // Thread para ler o progresso
                     Thread {
-                        val errorReader = process.errorStream.bufferedReader()
-                        var line: String?
-                        val regex = Regex("""Got (\d+)""")
+                        try {
+                            process.errorStream.bufferedReader().use { reader ->
+                                val progressRegex = Regex("""Got (\d+)""")
+                                val completionRegex = Regex("""(\d+) packets? captured""")
 
-                        while (errorReader.readLine().also { line = it } != null) {
-                            line?.let { logLine ->
-                                regex.find(logLine)?.groupValues?.get(1)?.toIntOrNull()?.let { count ->
-                                    Log.d("COUNT", "packets: $count")
+                                reader.forEachLine { line ->
+                                    Log.d("TCPDUMP_STDERR", line)
+
+                                    // Verifica progresso
+                                    progressRegex.find(line)?.groupValues?.get(1)?.toIntOrNull()?.let { count ->
+                                        Log.d("COUNT", "Progresso: $count/$packetCount")
+                                    }
+
+                                    // Verifica conclusão
+                                    completionRegex.find(line)?.groupValues?.get(1)?.toIntOrNull()?.let { captured ->
+                                        if (captured >= packetCount) {
+                                            Log.d("COUNT", "CAPTURA CONCLUÍDA: $captured pacotes")
+                                            CaptureRepository.updateCaptureState(sessionId, false)
+                                            callback(true, "Captura concluída")
+                                        }
+                                    }
                                 }
                             }
+                        } catch (e: Exception) {
+                            Log.e("COUNT_ERROR", "Erro ao ler stderr", e)
                         }
                     }.start()
 
@@ -119,13 +137,19 @@ class PacketCapturer(private val context: Context) {
                         }
                     }, timeLimit)
 
-                    for (i in 1..timeLimit) {
+                    for (i in 1..timeSeconds) {
                         Thread.sleep(1000)
                         val elapsedTime = i
+                        Log.d("elapsedTime", "elapsedTime: $i / $timeSeconds ")
+                        if (elapsedTime >= timeSeconds){
+                            CaptureRepository.updateCaptureState(sessionId, false)
+                            Log.d("elapsedTime", "FINALIZOU: elapsedTime: $i / $timeSeconds ")
+                        }
                     }
 
                     val exitCode = process.waitFor()
                     callback(exitCode == 0, outputFile)
+
                 } else {
                     callback(false, "IP não encontrado")
                 }

@@ -31,6 +31,11 @@ object CaptureRepository {
                     val sessionId = doc.id
                     val captureType = doc.getString("captureType") ?: if (doc.getLong("timeLimitMs") != null) "TIME_LIMIT" else "PACKET_COUNT"
                     val devicesMap = doc.get("devices") as? Map<String, Map<String, Any>> ?: emptyMap()
+                    val isActive = doc.getBoolean("isActive") ?: false
+                    val captureProgress = (doc.getLong("captureProgress") ?: 0).toInt()
+                    val captureTotal = (doc.getLong("captureTotal") ?: 100).toInt()
+                    val timeLimitMs = doc.getLong("timeLimitMs") ?: 0
+                    val lastCaptureTimestamp = doc.getLong("lastCaptureTimestamp")
 
                     val devices = devicesMap.map { (mac, deviceData) ->
                         Device(
@@ -55,7 +60,11 @@ object CaptureRepository {
                         timestamp = timestamp,
                         devices = devices,
                         captureType = captureType,
-                        isActive = devices.any { it.capturing }
+                        isActive = isActive,
+                        captureProgress = captureProgress,
+                        captureTotal = captureTotal,
+                        timeLimitMs = timeLimitMs,
+                        lastCaptureTimestamp = lastCaptureTimestamp
                     ))
                 }
 
@@ -102,7 +111,12 @@ object CaptureRepository {
             "timestamp" to timestamp,
             "sessionId" to sessionId,
             "devices" to devicesMap,
-            "captureType" to if (devices.any { it.timeLimitMs > 0 }) "TIME_LIMIT" else "PACKET_COUNT"  // Novo campo para tipo de captura
+            "captureType" to if (devices.any { it.timeLimitMs > 0 }) "TIME_LIMIT" else "PACKET_COUNT",
+            "isActive" to true,
+            "captureProgress" to 0,
+            "captureTotal" to if (timeLimitMs > 0) 0 else packetCount,
+            "timeLimitMs" to timeLimitMs,
+            "lastCaptureTimestamp" to timestamp
         )
 
         firestore.collection("captured_list")
@@ -219,15 +233,14 @@ object CaptureRepository {
             .addOnFailureListener { onComplete(false) }
     }
 
-    fun updateCaptureState(sessionId: String, device: Device, isCapturing: Boolean) {
+    fun updateCaptureState(sessionId: String, isActive: Boolean) {
         val userId = auth.currentUser?.uid ?: return
 
         firestore.collection("captured_list")
             .document(userId)
             .collection("captures")
             .document(sessionId)
-            .update("devices.${device.mac}.capturing", isCapturing)
+            .update("isActive", isActive)
     }
-
 
 }
