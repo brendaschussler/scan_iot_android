@@ -5,6 +5,7 @@ import android.content.Context
 import android.util.Log
 import android.widget.Toast
 import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.Query
 
@@ -116,7 +117,8 @@ object CaptureRepository {
             "captureProgress" to 0,
             "captureTotal" to if (timeLimitMs > 0) 0 else packetCount,
             "timeLimitMs" to timeLimitMs,
-            "lastCaptureTimestamp" to timestamp
+            "lastCaptureTimestamp" to timestamp,
+            "lastUpdated" to FieldValue.serverTimestamp()
         )
 
         firestore.collection("captured_list")
@@ -241,6 +243,26 @@ object CaptureRepository {
             .collection("captures")
             .document(sessionId)
             .update("isActive", isActive)
+    }
+
+    fun updateCaptureProgress(sessionId: String, progress: Int, total: Int) {
+        val userId = auth.currentUser?.uid ?: return
+
+        firestore.collection("captured_list")
+            .document(userId)
+            .collection("captures")
+            .document(sessionId)
+            .update(
+                mapOf(
+                    "captureProgress" to progress,
+                    "captureTotal" to total,
+                    "isActive" to (progress < total),
+                    "lastUpdated" to FieldValue.serverTimestamp()
+                )
+            )
+            .addOnFailureListener { e ->
+                Log.e("FIRESTORE", "Erro ao atualizar progresso", e)
+            }
     }
 
 }

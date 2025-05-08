@@ -2,8 +2,11 @@
 package com.example.scaniot
 
 import android.app.AlertDialog
+import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
+import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
@@ -18,6 +21,7 @@ import com.example.scaniot.model.CaptureRepository
 import com.example.scaniot.LoginActivity
 import com.example.scaniot.model.CapturedPacketsAdapter
 import com.example.scaniot.model.CaptureSession
+import com.example.scaniot.model.PacketCapturer
 import com.google.firebase.auth.FirebaseAuth
 
 class CapturedPacketsActivity : AppCompatActivity() {
@@ -27,6 +31,20 @@ class CapturedPacketsActivity : AppCompatActivity() {
 
     private val firebaseAuth by lazy {
         FirebaseAuth.getInstance()
+    }
+
+    private val progressReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context, intent: Intent) {
+            when (intent.action) {
+                PacketCapturer.PROGRESS_UPDATE_ACTION -> {
+                    val sessionId = intent.getStringExtra(PacketCapturer.EXTRA_SESSION_ID)
+                    val progress = intent.getIntExtra(PacketCapturer.EXTRA_PROGRESS, 0)
+                    val total = intent.getIntExtra(PacketCapturer.EXTRA_TOTAL, 100)
+
+                    updateSessionProgress(sessionId, progress, total)
+                }
+            }
+        }
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -41,10 +59,39 @@ class CapturedPacketsActivity : AppCompatActivity() {
         setupSwipeRefresh()
         loadCaptureSessions()
 
+        val filter = IntentFilter(PacketCapturer.PROGRESS_UPDATE_ACTION)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            registerReceiver(progressReceiver, filter, Context.RECEIVER_NOT_EXPORTED)
+        }
+
         ViewCompat.setOnApplyWindowInsetsListener(findViewById(R.id.main)) { v, insets ->
             val systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
             v.setPadding(systemBars.left, systemBars.top, systemBars.right, systemBars.bottom)
             insets
+        }
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        // Não esquecer de desregistrar
+        unregisterReceiver(progressReceiver)
+    }
+
+    private fun updateSessionProgress(sessionId: String?, progress: Int, total: Int) {
+        sessionId ?: return
+
+        val currentList = capturedPacketsAdapter.currentList.toMutableList()
+        val position = currentList.indexOfFirst { it.sessionId == sessionId }
+
+        if (position != -1) {
+            val session = currentList[position]
+            currentList[position] = session.copy(
+                captureProgress = progress,
+                captureTotal = total,
+                isActive = progress < total
+            )
+
+            capturedPacketsAdapter.submitList(currentList)
         }
     }
 

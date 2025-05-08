@@ -1,6 +1,7 @@
 package com.example.scaniot.model
 
 import android.content.Context
+import android.content.Intent
 import android.os.Bundle
 import android.util.Log
 import android.widget.Button
@@ -17,6 +18,23 @@ import java.util.TimerTask
 import kotlin.collections.iterator
 
 class PacketCapturer(private val context: Context) {
+
+    companion object {
+        const val PROGRESS_UPDATE_ACTION = "com.example.scaniot.PROGRESS_UPDATE"
+        const val EXTRA_SESSION_ID = "session_id"
+        const val EXTRA_PROGRESS = "progress"
+        const val EXTRA_TOTAL = "total"
+    }
+
+    private fun sendProgressUpdate(sessionId: String, progress: Int, total: Int) {
+        val intent = Intent(PROGRESS_UPDATE_ACTION).apply {
+            putExtra(EXTRA_SESSION_ID, sessionId)
+            putExtra(EXTRA_PROGRESS, progress)
+            putExtra(EXTRA_TOTAL, total)
+        }
+        context.sendBroadcast(intent)
+    }
+
 
     fun capture(macList: List<String>, packetCount: Int, outputFile: String, sessionId: String, callback: (Boolean, String) -> Unit) {
 
@@ -66,13 +84,17 @@ class PacketCapturer(private val context: Context) {
                                     // Verifica progresso
                                     progressRegex.find(line)?.groupValues?.get(1)?.toIntOrNull()?.let { count ->
                                         Log.d("COUNT", "Progresso: $count/$packetCount")
+                                        CaptureRepository.updateCaptureProgress(sessionId, count, packetCount)
+                                        sendProgressUpdate(sessionId, count, packetCount)
                                     }
 
                                     // Verifica conclusão
                                     completionRegex.find(line)?.groupValues?.get(1)?.toIntOrNull()?.let { captured ->
                                         if (captured >= packetCount) {
                                             Log.d("COUNT", "CAPTURA CONCLUÍDA: $captured pacotes")
+                                            CaptureRepository.updateCaptureProgress(sessionId, packetCount, packetCount)
                                             CaptureRepository.updateCaptureState(sessionId, false)
+                                            sendProgressUpdate(sessionId, packetCount, packetCount)
                                             callback(true, "Captura concluída")
                                         }
                                     }
@@ -141,6 +163,7 @@ class PacketCapturer(private val context: Context) {
                         Thread.sleep(1000)
                         val elapsedTime = i
                         Log.d("elapsedTime", "elapsedTime: $i / $timeSeconds ")
+
                         if (elapsedTime >= timeSeconds){
                             CaptureRepository.updateCaptureState(sessionId, false)
                             Log.d("elapsedTime", "FINALIZOU: elapsedTime: $i / $timeSeconds ")

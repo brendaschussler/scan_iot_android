@@ -43,12 +43,27 @@ class CapturedPacketsAdapter : ListAdapter<CaptureSession, CapturedPacketsAdapte
                 txtDevicesCount.text = "Devices: ${session.devices.size}"
                 txtCaptureType.text = "Type: ${session.captureType.replace("_", " ")}"
 
-                // Configuração do status
+                progressBarSession.max = session.captureTotal
+                progressBarSession.progress = session.captureProgress
+
+                // Mostrar porcentagem (opcional)
+                val percent = if (session.captureTotal > 0) {
+                    (session.captureProgress * 100) / session.captureTotal
+                } else {
+                    0
+                }
                 txtSessionStatus.text = if (session.isActive) {
+                    "Active ($percent%)"
+                } else {
+                    "Completed (${session.captureProgress}/${session.captureTotal})"
+                }
+
+                // Configuração do status
+                /*txtSessionStatus.text = if (session.isActive) {
                     "Active (${session.captureProgress}/${session.captureTotal})"
                 } else {
                     "Completed"
-                }
+                }*/
 
                 // Botões de ação
                 btnStopSession.visibility = if (session.isActive) View.VISIBLE else View.GONE
