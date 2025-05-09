@@ -7,6 +7,7 @@ import android.widget.Toast
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.ListenerRegistration
 import com.google.firebase.firestore.Query
 
 object CaptureRepository {
@@ -74,8 +75,7 @@ object CaptureRepository {
             .addOnFailureListener { onFailure() }
     }
 
-    fun saveNewCapture(context: Context, devices: List<Device>, selectedDevices: List<Device>, packetCount: Int, timeLimitMs: Long, filename : String, onComplete: (Boolean) -> Unit = {}) {
-
+    fun saveNewCapture(context: Context, devices: List<Device>, selectedDevices: List<Device>, packetCount: Int, timeLimitMs: Long, filename: String, onComplete: (Boolean) -> Unit = {}) {
         val userId = auth.currentUser?.uid ?: run {
             onComplete(false)
             return
@@ -84,26 +84,21 @@ object CaptureRepository {
         val timestamp = System.currentTimeMillis()
         val sessionId = firestore.collection("captured_list").document().id
 
-        if (timeLimitMs > 0){
-            startCaptureTime(context, selectedDevices, timeLimitMs, filename, sessionId)
-        }else {
-            startCapture(context, selectedDevices, packetCount, filename, sessionId)
-        }
-
+        // Initialize device states
         val devicesMap = devices.associate { device ->
             device.mac to hashMapOf(
                 "name" to device.name,
                 "mac" to device.mac,
-                "captureTotal" to device.captureTotal,
-                "timeLimitMs" to device.timeLimitMs,  // Novo campo adicionado
-                "captureProgress" to device.captureProgress,
-                "capturing" to device.capturing,
-                "lastCaptureTimestamp" to device.lastCaptureTimestamp,
+                "captureTotal" to if (selectedDevices.any { it.mac == device.mac }) (if (timeLimitMs > 0) 0 else packetCount) else 0,
+                "timeLimitMs" to if (selectedDevices.any { it.mac == device.mac }) timeLimitMs else 0,
+                "captureProgress" to 0,
+                "capturing" to selectedDevices.any { it.mac == device.mac },
+                "lastCaptureTimestamp" to timestamp,
                 "ip" to device.ip,
                 "vendor" to device.vendor,
                 "deviceModel" to device.deviceModel,
                 "deviceLocation" to device.deviceLocation,
-                "sessionId" to sessionId,  // Adicionando sessionId a cada dispositivo
+                "sessionId" to sessionId,
                 "sessionTimestamp" to timestamp
             )
         }
@@ -112,7 +107,7 @@ object CaptureRepository {
             "timestamp" to timestamp,
             "sessionId" to sessionId,
             "devices" to devicesMap,
-            "captureType" to if (devices.any { it.timeLimitMs > 0 }) "TIME_LIMIT" else "PACKET_COUNT",
+            "captureType" to if (timeLimitMs > 0) "TIME_LIMIT" else "PACKET_COUNT",
             "isActive" to true,
             "captureProgress" to 0,
             "captureTotal" to if (timeLimitMs > 0) 0 else packetCount,
@@ -126,7 +121,14 @@ object CaptureRepository {
             .collection("captures")
             .document(sessionId)
             .set(captureSession)
-            .addOnSuccessListener { onComplete(true) }
+            .addOnSuccessListener {
+                if (timeLimitMs > 0) {
+                    startCaptureTime(context, selectedDevices, timeLimitMs, filename, sessionId)
+                } else {
+                    startCapture(context, selectedDevices, packetCount, filename, sessionId)
+                }
+                onComplete(true)
+            }
             .addOnFailureListener { onComplete(false) }
     }
 
@@ -138,7 +140,6 @@ object CaptureRepository {
         sessionId: String
     ) {
         val macList = selectedDevices.map { it.mac }
-
 
         if (!checkRootAccess()) {
             showRootRequiredDialogTime(context, selectedDevices, timeLimit, outputFile, sessionId)
@@ -152,6 +153,42 @@ object CaptureRepository {
                 Log.d("OK", "error")
             }
         }
+    }
+
+    // Add this function to listen for device updates
+    fun listenForDeviceUpdates(onUpdate: (Device) -> Unit): ListenerRegistration {
+        val userId = auth.currentUser?.uid ?: return object : ListenerRegistration {
+            override fun remove() {}
+        }
+
+        return firestore.collection("captured_list")
+            .document(userId)
+            .collection("captures")
+            .addSnapshotListener { snapshots, error ->
+                if (error != null) return@addSnapshotListener
+
+                snapshots?.forEach { session ->
+                    val devicesMap = session.get("devices") as? Map<String, Map<String, Any>> ?: emptyMap()
+                    devicesMap.forEach { (mac, deviceData) ->
+                        val device = Device(
+                            name = deviceData["name"] as? String ?: "",
+                            mac = mac,
+                            captureTotal = (deviceData["captureTotal"] as? Long)?.toInt() ?: 0,
+                            timeLimitMs = deviceData["timeLimitMs"] as? Long ?: 0,
+                            captureProgress = (deviceData["captureProgress"] as? Long)?.toInt() ?: 0,
+                            capturing = deviceData["capturing"] as? Boolean ?: false,
+                            lastCaptureTimestamp = deviceData["lastCaptureTimestamp"] as? Long ?: 0,
+                            ip = deviceData["ip"] as? String ?: "",
+                            vendor = deviceData["vendor"] as? String ?: "",
+                            deviceModel = deviceData["deviceModel"] as? String ?: "",
+                            deviceLocation = deviceData["deviceLocation"] as? String ?: "",
+                            sessionId = session.id,
+                            sessionTimestamp = session.getLong("timestamp") ?: 0
+                        )
+                        onUpdate(device)
+                    }
+                }
+            }
     }
 
     private fun showRootRequiredDialogTime(
@@ -220,6 +257,25 @@ object CaptureRepository {
         }
     }
 
+    fun stopDeviceCapture(sessionId: String, mac: String, onComplete: (Boolean) -> Unit) {
+        val userId = auth.currentUser?.uid ?: run {
+            onComplete(false)
+            return
+        }
+
+        firestore.collection("captured_list")
+            .document(userId)
+            .collection("captures")
+            .document(sessionId)
+            .update(
+                "devices.$mac.capturing", false,
+                "devices.$mac.captureProgress", 0,
+                "lastUpdated", FieldValue.serverTimestamp()
+            )
+            .addOnSuccessListener { onComplete(true) }
+            .addOnFailureListener { onComplete(false) }
+    }
+
     fun deleteCaptureSession(sessionId: String, onComplete: (Boolean) -> Unit) {
         val userId = auth.currentUser?.uid ?: run {
             onComplete(false)
@@ -235,6 +291,38 @@ object CaptureRepository {
             .addOnFailureListener { onComplete(false) }
     }
 
+    fun deleteDeviceCapture(sessionId: String, mac: String, onComplete: (Boolean) -> Unit) {
+        val userId = auth.currentUser?.uid ?: run {
+            onComplete(false)
+            return
+        }
+
+        firestore.collection("captured_list")
+            .document(userId)
+            .collection("captures")
+            .document(sessionId)
+            .update(
+                "devices.$mac", FieldValue.delete(),
+                "lastUpdated", FieldValue.serverTimestamp()
+            )
+            .addOnSuccessListener { onComplete(true) }
+            .addOnFailureListener { onComplete(false) }
+
+        // Verifica se a sessão ficou vazia após deletar o dispositivo
+        firestore.collection("captured_list")
+            .document(userId)
+            .collection("captures")
+            .document(sessionId)
+            .get()
+            .addOnSuccessListener { doc ->
+                val devices = doc.get("devices") as? Map<*, *>
+                if (devices.isNullOrEmpty()) {
+                    // Deleta a sessão inteira se não houver mais dispositivos
+                    doc.reference.delete()
+                }
+            }
+    }
+
     fun updateCaptureState(sessionId: String, isActive: Boolean) {
         val userId = auth.currentUser?.uid ?: return
 
@@ -243,6 +331,34 @@ object CaptureRepository {
             .collection("captures")
             .document(sessionId)
             .update("isActive", isActive)
+    }
+
+    fun updateDeviceCaptureProgress(sessionId: String, mac: String, progress: Int, total: Int) {
+        val userId = auth.currentUser?.uid ?: return
+
+        firestore.collection("captured_list")
+            .document(userId)
+            .collection("captures")
+            .document(sessionId)
+            .update(
+                "devices.$mac.captureProgress", progress,
+                "devices.$mac.captureTotal", total,
+                "devices.$mac.capturing", (progress < total),
+                "lastUpdated", FieldValue.serverTimestamp()
+            )
+    }
+
+    fun updateDeviceCaptureState(sessionId: String, mac: String, isActive: Boolean) {
+        val userId = auth.currentUser?.uid ?: return
+
+        firestore.collection("captured_list")
+            .document(userId)
+            .collection("captures")
+            .document(sessionId)
+            .update(
+                "devices.$mac.capturing", isActive,
+                "lastUpdated", FieldValue.serverTimestamp()
+            )
     }
 
     fun updateCaptureProgress(sessionId: String, progress: Int, total: Int) {

@@ -21,19 +21,23 @@ import com.example.scaniot.model.CaptureRepository
 import com.example.scaniot.LoginActivity
 import com.example.scaniot.model.CapturedPacketsAdapter
 import com.example.scaniot.model.CaptureSession
+import com.example.scaniot.model.Device
 import com.example.scaniot.model.PacketCapturer
 import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.firestore.ListenerRegistration
 
 class CapturedPacketsActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityCapturedPacketsBinding
     private lateinit var capturedPacketsAdapter: CapturedPacketsAdapter
 
+    private var deviceUpdatesListener: ListenerRegistration? = null
+
     private val firebaseAuth by lazy {
         FirebaseAuth.getInstance()
     }
 
-    private val progressReceiver = object : BroadcastReceiver() {
+    /*private val progressReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
             when (intent.action) {
                 PacketCapturer.PROGRESS_UPDATE_ACTION -> {
@@ -42,6 +46,35 @@ class CapturedPacketsActivity : AppCompatActivity() {
                     val total = intent.getIntExtra(PacketCapturer.EXTRA_TOTAL, 100)
 
                     updateSessionProgress(sessionId, progress, total)
+                }
+            }
+        }
+    }*/
+
+    private val progressReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context, intent: Intent) {
+            when (intent.action) {
+                PacketCapturer.PROGRESS_UPDATE_ACTION -> {
+                    val sessionId = intent.getStringExtra(PacketCapturer.EXTRA_SESSION_ID)
+                    val mac = intent.getStringExtra("mac") ?: return
+                    val progress = intent.getIntExtra(PacketCapturer.EXTRA_PROGRESS, 0)
+                    val total = intent.getIntExtra(PacketCapturer.EXTRA_TOTAL, 100)
+
+                    // Update the specific device in the list
+                    val currentList = capturedPacketsAdapter.currentList.toMutableList()
+                    val position = currentList.indexOfFirst {
+                        it.mac == mac && it.sessionId == sessionId
+                    }
+
+                    if (position != -1) {
+                        val device = currentList[position].copy(
+                            captureProgress = progress,
+                            captureTotal = total,
+                            capturing = progress < total
+                        )
+                        currentList[position] = device
+                        capturedPacketsAdapter.submitList(currentList)
+                    }
                 }
             }
         }
@@ -64,6 +97,20 @@ class CapturedPacketsActivity : AppCompatActivity() {
             registerReceiver(progressReceiver, filter, Context.RECEIVER_NOT_EXPORTED)
         }
 
+        /*deviceUpdatesListener = CaptureRepository.listenForDeviceUpdates { updatedDevice ->
+            val currentList = capturedPacketsAdapter.currentList.toMutableList()
+            val position = currentList.indexOfFirst { it.mac == updatedDevice.mac && it.sessionId == updatedDevice.sessionId }
+
+            if (position != -1) {
+                currentList[position] = updatedDevice
+                capturedPacketsAdapter.submitList(currentList)
+            } else {
+                // New device found, add to list
+                currentList.add(updatedDevice)
+                capturedPacketsAdapter.submitList(currentList)
+            }
+        }*/
+
         ViewCompat.setOnApplyWindowInsetsListener(findViewById(R.id.main)) { v, insets ->
             val systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
             v.setPadding(systemBars.left, systemBars.top, systemBars.right, systemBars.bottom)
@@ -74,24 +121,21 @@ class CapturedPacketsActivity : AppCompatActivity() {
     override fun onDestroy() {
         super.onDestroy()
         // Não esquecer de desregistrar
+        //deviceUpdatesListener?.remove()
         unregisterReceiver(progressReceiver)
     }
 
     private fun updateSessionProgress(sessionId: String?, progress: Int, total: Int) {
         sessionId ?: return
 
-        val currentList = capturedPacketsAdapter.currentList.toMutableList()
-        val position = currentList.indexOfFirst { it.sessionId == sessionId }
+        // Parse the MAC address from the sessionId (format: "sessionId_mac")
+        val parts = sessionId.split("_")
+        if (parts.size >= 2) {
+            val actualSessionId = parts[0]
+            val mac = parts[1]
 
-        if (position != -1) {
-            val session = currentList[position]
-            currentList[position] = session.copy(
-                captureProgress = progress,
-                captureTotal = total,
-                isActive = progress < total
-            )
-
-            capturedPacketsAdapter.submitList(currentList)
+            // Update the specific device's progress
+            CaptureRepository.updateDeviceCaptureProgress(actualSessionId, mac, progress, total)
         }
     }
 
@@ -108,7 +152,11 @@ class CapturedPacketsActivity : AppCompatActivity() {
 
         CaptureRepository.getAllCaptureSessions(
             onSuccess = { sessions ->
-                updateSessionList(sessions)
+                // Flatten the list of devices from all sessions
+                val allDevices = sessions.flatMap { session ->
+                    session.devices.map { device -> device.copy(sessionId = session.sessionId) }
+                }
+                updateDeviceList(allDevices)
                 binding.swipeRefreshLayout.isRefreshing = false
             },
             onFailure = {
@@ -118,13 +166,12 @@ class CapturedPacketsActivity : AppCompatActivity() {
         )
     }
 
-    private fun updateSessionList(newSessions: List<CaptureSession>) {
-        if (capturedPacketsAdapter.currentList != newSessions) {
-            capturedPacketsAdapter.submitList(newSessions) {
-                binding.rvListCapturedPackets.scrollToPosition(0)
-            }
+    private fun updateDeviceList(newDevices: List<Device>) {
+        capturedPacketsAdapter.submitList(newDevices) {
+            binding.rvListCapturedPackets.scrollToPosition(0)
         }
     }
+
 
     fun Context.showMessage(message: String) {
         Toast.makeText(this, message, Toast.LENGTH_SHORT).show()
