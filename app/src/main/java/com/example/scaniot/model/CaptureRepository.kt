@@ -90,7 +90,8 @@ object CaptureRepository {
                 "name" to device.name,
                 "mac" to device.mac,
                 "captureTotal" to if (selectedDevices.any { it.mac == device.mac }) (if (timeLimitMs > 0) 0 else packetCount) else 0,
-                "timeLimitMs" to if (selectedDevices.any { it.mac == device.mac }) timeLimitMs else 0,
+                //"timeLimitMs" to if (selectedDevices.any { it.mac == device.mac }) timeLimitMs else 0,
+                "timeLimitMs" to timeLimitMs,
                 "captureProgress" to 0,
                 "capturing" to selectedDevices.any { it.mac == device.mac },
                 "lastCaptureTimestamp" to timestamp,
@@ -153,42 +154,6 @@ object CaptureRepository {
                 Log.d("OK", "error")
             }
         }
-    }
-
-    // Add this function to listen for device updates
-    fun listenForDeviceUpdates(onUpdate: (Device) -> Unit): ListenerRegistration {
-        val userId = auth.currentUser?.uid ?: return object : ListenerRegistration {
-            override fun remove() {}
-        }
-
-        return firestore.collection("captured_list")
-            .document(userId)
-            .collection("captures")
-            .addSnapshotListener { snapshots, error ->
-                if (error != null) return@addSnapshotListener
-
-                snapshots?.forEach { session ->
-                    val devicesMap = session.get("devices") as? Map<String, Map<String, Any>> ?: emptyMap()
-                    devicesMap.forEach { (mac, deviceData) ->
-                        val device = Device(
-                            name = deviceData["name"] as? String ?: "",
-                            mac = mac,
-                            captureTotal = (deviceData["captureTotal"] as? Long)?.toInt() ?: 0,
-                            timeLimitMs = deviceData["timeLimitMs"] as? Long ?: 0,
-                            captureProgress = (deviceData["captureProgress"] as? Long)?.toInt() ?: 0,
-                            capturing = deviceData["capturing"] as? Boolean ?: false,
-                            lastCaptureTimestamp = deviceData["lastCaptureTimestamp"] as? Long ?: 0,
-                            ip = deviceData["ip"] as? String ?: "",
-                            vendor = deviceData["vendor"] as? String ?: "",
-                            deviceModel = deviceData["deviceModel"] as? String ?: "",
-                            deviceLocation = deviceData["deviceLocation"] as? String ?: "",
-                            sessionId = session.id,
-                            sessionTimestamp = session.getLong("timestamp") ?: 0
-                        )
-                        onUpdate(device)
-                    }
-                }
-            }
     }
 
     private fun showRootRequiredDialogTime(
@@ -255,25 +220,6 @@ object CaptureRepository {
                 Log.d("OK", "error")
             }
         }
-    }
-
-    fun stopDeviceCapture(sessionId: String, mac: String, onComplete: (Boolean) -> Unit) {
-        val userId = auth.currentUser?.uid ?: run {
-            onComplete(false)
-            return
-        }
-
-        firestore.collection("captured_list")
-            .document(userId)
-            .collection("captures")
-            .document(sessionId)
-            .update(
-                "devices.$mac.capturing", false,
-                "devices.$mac.captureProgress", 0,
-                "lastUpdated", FieldValue.serverTimestamp()
-            )
-            .addOnSuccessListener { onComplete(true) }
-            .addOnFailureListener { onComplete(false) }
     }
 
     fun deleteCaptureSession(sessionId: String, onComplete: (Boolean) -> Unit) {
@@ -359,26 +305,6 @@ object CaptureRepository {
                 "devices.$mac.capturing", isActive,
                 "lastUpdated", FieldValue.serverTimestamp()
             )
-    }
-
-    fun updateCaptureProgress(sessionId: String, progress: Int, total: Int) {
-        val userId = auth.currentUser?.uid ?: return
-
-        firestore.collection("captured_list")
-            .document(userId)
-            .collection("captures")
-            .document(sessionId)
-            .update(
-                mapOf(
-                    "captureProgress" to progress,
-                    "captureTotal" to total,
-                    "isActive" to (progress < total),
-                    "lastUpdated" to FieldValue.serverTimestamp()
-                )
-            )
-            .addOnFailureListener { e ->
-                Log.e("FIRESTORE", "Erro ao atualizar progresso", e)
-            }
     }
 
 }

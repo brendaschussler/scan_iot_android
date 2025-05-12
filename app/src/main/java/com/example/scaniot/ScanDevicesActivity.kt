@@ -306,11 +306,13 @@ class ScanDevicesActivity : AppCompatActivity() {
 
             binding.btnStartScan.isEnabled = false
             binding.progressBarCircular.visibility = View.VISIBLE
+            binding.rvListScanDevices.visibility = View.GONE
 
             CoroutineScope(Dispatchers.Main).launch {
                 try {
                     val discoveredDevices = withContext(Dispatchers.IO) {
-                        networkScanner.scanNetworkDevices(hasRootAccess = rootAccessGranted)
+                        //networkScanner.getConnectedHotspotDevices(hasRootAccess = rootAccessGranted)
+                        networkScanner.getConnectedHotspotDevices()
                     }
 
                     scannedDevices.clear()
@@ -333,6 +335,7 @@ class ScanDevicesActivity : AppCompatActivity() {
                     ).show()
                     Log.e("NetworkScan", "Erro ao escanear rede", e)
                 } finally {
+                    binding.rvListScanDevices.visibility = View.VISIBLE
                     binding.btnStartScan.isEnabled = true
                     binding.progressBarCircular.visibility = View.GONE
                 }

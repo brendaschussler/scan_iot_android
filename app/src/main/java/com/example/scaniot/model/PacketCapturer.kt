@@ -26,15 +26,6 @@ class PacketCapturer(private val context: Context) {
         const val EXTRA_TOTAL = "total"
     }
 
-    private fun sendProgressUpdate(sessionId: String, progress: Int, total: Int) {
-        val intent = Intent(PROGRESS_UPDATE_ACTION).apply {
-            putExtra(EXTRA_SESSION_ID, sessionId)
-            putExtra(EXTRA_PROGRESS, progress)
-            putExtra(EXTRA_TOTAL, total)
-        }
-        context.sendBroadcast(intent)
-    }
-
     private fun sendDeviceProgressUpdate(sessionId: String, mac: String, progress: Int, total: Int) {
         val intent = Intent(PROGRESS_UPDATE_ACTION).apply {
             putExtra(EXTRA_SESSION_ID, sessionId) // Combine sessionId and mac
@@ -110,69 +101,66 @@ class PacketCapturer(private val context: Context) {
     }
 
     fun captureByTime(macList: List<String>, timeLimit: Long, outputFile: String, sessionId: String, callback: (Boolean, String) -> Unit) {
+        macList.forEach { mac ->
 
-        Thread {
-            try {
-                val process = Runtime.getRuntime().exec("su")
-                val outputStream = DataOutputStream(process.outputStream)
+            Thread {
+                try {
+                    val process = Runtime.getRuntime().exec("su")
+                    val outputStream = DataOutputStream(process.outputStream)
 
-                val filter = macList.joinToString(" or ") { "ether host $it" }
-                val localIp = getActiveIpAddress()
-                Log.d("TCPDUMP", "LocalIp: $localIp")
+                    val filter = macList.joinToString(" or ") { "ether host $it" }
+                    val localIp = getActiveIpAddress()
+                    Log.d("TCPDUMP", "LocalIp: $localIp")
 
-                if (localIp != null) {
-                    val networkPrefix = getNetworkPrefix(localIp)
-                    Log.d("TCPDUMP", "NetworkPrefix: $networkPrefix")
-                    val cmdIp = "ip -o addr show | grep $networkPrefix"
-                    val process = Runtime.getRuntime().exec(arrayOf("su", "-c", cmdIp))
-                    val reader = process.inputStream.bufferedReader()
-                    val output = reader.readText()
-                    process.waitFor()
+                    if (localIp != null) {
+                        val networkPrefix = getNetworkPrefix(localIp)
+                        Log.d("TCPDUMP", "NetworkPrefix: $networkPrefix")
+                        val cmdIp = "ip -o addr show | grep $networkPrefix"
+                        val process = Runtime.getRuntime().exec(arrayOf("su", "-c", cmdIp))
+                        val reader = process.inputStream.bufferedReader()
+                        val output = reader.readText()
+                        process.waitFor()
 
-                    val interfaceName = Regex("""^\d+:\s+(\S+)""").find(output)?.groupValues?.get(1)
-                    val timeSeconds = timeLimit / 1000
-                    val outputFileName = "/sdcard/${outputFile}_${sessionId}.pcap"
+                        val interfaceName = Regex("""^\d+:\s+(\S+)""").find(output)?.groupValues?.get(1)
+                        val timeSeconds = timeLimit / 1000
+                        val outputFileName = "/sdcard/${outputFile}_${mac}_${sessionId}.pcap"
 
-                    //MINIMO É 360s
-                    val command = "timeout ${timeSeconds}s tcpdump -i $interfaceName $filter -s 0 -w $outputFileName\n"
+                        val command = "timeout ${timeSeconds}s tcpdump -i $interfaceName ether host $mac -s 0 -v -w $outputFileName\n"
 
-                    Log.d("TCPDUMP", "Executando: $command")
+                        Log.d("TCPDUMP", "Executando: $command")
 
-                    outputStream.writeBytes(command)
-                    outputStream.writeBytes("exit\n")
-                    outputStream.flush()
+                        outputStream.writeBytes(command)
+                        outputStream.writeBytes("exit\n")
+                        outputStream.flush()
 
-                    Timer().schedule(object : TimerTask() {
-                        override fun run() {
-                            try {
-                                //stopCapture(sessionId)
-                            } catch (e: Exception) {
-                                Log.e("TCPDUMP", "Erro ao encerrar tcpdump", e)
+                        for (i in 1..timeSeconds) {
+                            Thread.sleep(1000)
+                            val elapsedTime = i
+                            Log.d("elapsedTime", "elapsedTime: $elapsedTime / $timeSeconds ")
+                            CaptureRepository.updateDeviceCaptureProgress(sessionId, mac, elapsedTime.toInt(), timeSeconds.toInt())
+                            sendDeviceProgressUpdate(sessionId, mac, elapsedTime.toInt(), timeSeconds.toInt())
+
+                            if (elapsedTime >= timeSeconds){
+                                CaptureRepository.updateCaptureState(sessionId, false)
+                                Log.d("elapsedTime", "FINALIZOU: elapsedTime: $i / $timeSeconds ")
+                                CaptureRepository.updateDeviceCaptureProgress(sessionId, mac, elapsedTime.toInt(), elapsedTime.toInt())
+                                CaptureRepository.updateDeviceCaptureState(sessionId, mac, false)
+                                sendDeviceProgressUpdate(sessionId, mac, elapsedTime.toInt(), elapsedTime.toInt())
                             }
                         }
-                    }, timeLimit)
 
-                    for (i in 1..timeSeconds) {
-                        Thread.sleep(1000)
-                        val elapsedTime = i
-                        Log.d("elapsedTime", "elapsedTime: $i / $timeSeconds ")
+                        val exitCode = process.waitFor()
+                        callback(exitCode == 0, outputFile)
 
-                        if (elapsedTime >= timeSeconds){
-                            CaptureRepository.updateCaptureState(sessionId, false)
-                            Log.d("elapsedTime", "FINALIZOU: elapsedTime: $i / $timeSeconds ")
-                        }
+                    } else {
+                        callback(false, "IP não encontrado")
                     }
-
-                    val exitCode = process.waitFor()
-                    callback(exitCode == 0, outputFile)
-
-                } else {
-                    callback(false, "IP não encontrado")
+                } catch (e: Exception) {
+                    callback(false, "Erro: ${e.message}")
                 }
-            } catch (e: Exception) {
-                callback(false, "Erro: ${e.message}")
-            }
-        }.start()
+            }.start()
+
+        }
     }
 
     private fun getActiveIpAddress(): String? {
@@ -198,28 +186,6 @@ class PacketCapturer(private val context: Context) {
     private fun getNetworkPrefix(ipAddress: String): String {
         val parts = ipAddress.split(".")
         return if (parts.size == 4) "${parts[0]}.${parts[1]}.${parts[2]}." else "192.168.43." // hotspot padrão
-    }
-
-    fun stopCapture(sessionId: String, mac: String): Boolean {
-        return try {
-
-            val killProcess = Runtime.getRuntime().exec("su")
-            val killOutputStream = DataOutputStream(killProcess.outputStream)
-
-            //killOutputStream.writeBytes("pkill -SIGINT -f \"tcpdump.*$sessionId\"\n")
-            killOutputStream.writeBytes("pkill -SIGINT -f \"tcpdump.*${sessionId}\"\n")
-            killOutputStream.writeBytes("exit\n")
-            killOutputStream.flush()
-
-            killProcess.waitFor()
-
-            true
-
-        } catch (e: Exception) {
-            Log.e("TCPDUMP", "Error stopping tcpdump for session $sessionId", e)
-            false
-        }
-
     }
 
     fun stopDeviceCapture(sessionId: String, mac: String): Boolean {

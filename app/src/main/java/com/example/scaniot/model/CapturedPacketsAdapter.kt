@@ -103,35 +103,6 @@ class CapturedPacketsAdapter : ListAdapter<Device, CapturedPacketsAdapter.Device
                 .show()
         }
 
-
-        private fun deleteSession(session: CaptureSession) {
-            AlertDialog.Builder(binding.root.context)
-                .setTitle("Delete Session")
-                .setMessage("Delete this capture session and all its devices?")
-                .setNegativeButton("Cancel") { dialog, _ -> dialog.dismiss() }
-                .setPositiveButton("Delete") { _, _ ->
-                    CaptureRepository.deleteCaptureSession(session.sessionId) { success ->
-                        if (success) {
-                            val newList = currentList.toMutableList().apply {
-                                removeAt(adapterPosition)
-                            }
-                            submitList(newList)
-                        }
-                    }
-                }
-                .show()
-        }
-
-        private fun viewDevices(session: CaptureSession) {
-            val devicesList = session.devices.joinToString("\n") { "${it.name} (${it.mac})" }
-
-            AlertDialog.Builder(binding.root.context)
-                .setTitle("Devices in Session")
-                .setMessage(devicesList)
-                .setPositiveButton("OK", null)
-                .show()
-        }
-
         private fun deleteDevice(device: Device) {
             AlertDialog.Builder(binding.root.context)
                 .setTitle("Delete Device")

@@ -31,25 +31,9 @@ class CapturedPacketsActivity : AppCompatActivity() {
     private lateinit var binding: ActivityCapturedPacketsBinding
     private lateinit var capturedPacketsAdapter: CapturedPacketsAdapter
 
-    private var deviceUpdatesListener: ListenerRegistration? = null
-
     private val firebaseAuth by lazy {
         FirebaseAuth.getInstance()
     }
-
-    /*private val progressReceiver = object : BroadcastReceiver() {
-        override fun onReceive(context: Context, intent: Intent) {
-            when (intent.action) {
-                PacketCapturer.PROGRESS_UPDATE_ACTION -> {
-                    val sessionId = intent.getStringExtra(PacketCapturer.EXTRA_SESSION_ID)
-                    val progress = intent.getIntExtra(PacketCapturer.EXTRA_PROGRESS, 0)
-                    val total = intent.getIntExtra(PacketCapturer.EXTRA_TOTAL, 100)
-
-                    updateSessionProgress(sessionId, progress, total)
-                }
-            }
-        }
-    }*/
 
     private val progressReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
@@ -74,7 +58,9 @@ class CapturedPacketsActivity : AppCompatActivity() {
                         )
                         currentList[position] = device
                         capturedPacketsAdapter.submitList(currentList)
+
                     }
+
                 }
             }
         }
@@ -97,20 +83,6 @@ class CapturedPacketsActivity : AppCompatActivity() {
             registerReceiver(progressReceiver, filter, Context.RECEIVER_NOT_EXPORTED)
         }
 
-        /*deviceUpdatesListener = CaptureRepository.listenForDeviceUpdates { updatedDevice ->
-            val currentList = capturedPacketsAdapter.currentList.toMutableList()
-            val position = currentList.indexOfFirst { it.mac == updatedDevice.mac && it.sessionId == updatedDevice.sessionId }
-
-            if (position != -1) {
-                currentList[position] = updatedDevice
-                capturedPacketsAdapter.submitList(currentList)
-            } else {
-                // New device found, add to list
-                currentList.add(updatedDevice)
-                capturedPacketsAdapter.submitList(currentList)
-            }
-        }*/
-
         ViewCompat.setOnApplyWindowInsetsListener(findViewById(R.id.main)) { v, insets ->
             val systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
             v.setPadding(systemBars.left, systemBars.top, systemBars.right, systemBars.bottom)
@@ -120,23 +92,7 @@ class CapturedPacketsActivity : AppCompatActivity() {
 
     override fun onDestroy() {
         super.onDestroy()
-        // Não esquecer de desregistrar
-        //deviceUpdatesListener?.remove()
         unregisterReceiver(progressReceiver)
-    }
-
-    private fun updateSessionProgress(sessionId: String?, progress: Int, total: Int) {
-        sessionId ?: return
-
-        // Parse the MAC address from the sessionId (format: "sessionId_mac")
-        val parts = sessionId.split("_")
-        if (parts.size >= 2) {
-            val actualSessionId = parts[0]
-            val mac = parts[1]
-
-            // Update the specific device's progress
-            CaptureRepository.updateDeviceCaptureProgress(actualSessionId, mac, progress, total)
-        }
     }
 
     private fun setupSwipeRefresh() {

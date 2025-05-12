@@ -9,6 +9,7 @@ import android.util.Log
 import java.net.InetAddress
 import kotlinx.coroutines.*
 import java.io.BufferedReader
+import java.io.DataOutputStream
 import java.io.File
 import java.io.InputStreamReader
 import java.net.NetworkInterface
@@ -128,7 +129,54 @@ class NetworkScanner(private val context: Context) {
         return if (parts.size == 4) "${parts[0]}.${parts[1]}.${parts[2]}." else "192.168.43." // hotspot padrão
     }
 
-    suspend fun scanNetworkDevices(timeout: Int = 2000, hasRootAccess: Boolean = false): List<Device> = withContext(Dispatchers.IO) {
+    suspend fun getConnectedHotspotDevices(): List<Device> = withContext(Dispatchers.IO) {
+        val devices = mutableListOf<Device>()
+        val localIp = getActiveIpAddress() ?: return@withContext devices
+        val networkPrefix = getNetworkPrefix(localIp)
+
+        val suProcess = Runtime.getRuntime().exec("su")
+        val outputStream = DataOutputStream(suProcess.outputStream)
+        val inputStream = suProcess.inputStream
+
+        // Envia o comando para obter dispositivos da subrede via ip neigh
+        val command = "ip neigh | grep '^$networkPrefix'\n"
+        outputStream.writeBytes(command)
+        outputStream.writeBytes("exit\n")
+        outputStream.flush()
+
+        val lines = inputStream.bufferedReader().readLines()
+
+        for (line in lines) {
+            val parts = line.trim().split(Regex("\\s+"))
+            if (parts.size >= 5) {
+                val ip = parts[0]
+                val mac = parts[4]
+                if (mac.matches(Regex("([0-9a-fA-F]{2}:){5}[0-9a-fA-F]{2}")) && mac != "00:00:00:00:00:00") {
+                    val name = getDeviceName(ip, true) ?: "Unknown"
+                    devices.add(
+                        Device(
+                            ip = ip,
+                            mac = mac,
+                            name = name,
+                            description = "ARP via ip neigh",
+                            vendor = getVendorFromMac(mac),
+                            deviceModel = "Unknown",
+                            deviceLocation = "Unknown",
+                            deviceVersion = "Unknown",
+                            deviceType = guessDeviceType(name),
+                            userId = ""
+                        )
+                    )
+                }
+            }
+        }
+
+        suProcess.waitFor()
+        devices
+    }
+
+
+    /*suspend fun scanNetworkDevices(timeout: Int = 2000, hasRootAccess: Boolean = false): List<Device> = withContext(Dispatchers.IO) {
         val devicesFound = mutableListOf<Device>()
 
         // add first the own device that is running the app
@@ -184,7 +232,7 @@ class NetworkScanner(private val context: Context) {
         }.awaitAll().filterNotNull().also { devicesFound.addAll(it) }
 
         devicesFound
-    }
+    }*/
 
     fun getSelfDeviceInfo(): Device? {
         return try {
