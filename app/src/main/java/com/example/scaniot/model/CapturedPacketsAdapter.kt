@@ -53,14 +53,22 @@ class CapturedPacketsAdapter : ListAdapter<Device, CapturedPacketsAdapter.Device
                 } else {
                     0
                 }
-                txtSessionStatus.text = if (device.capturing) {
-                    "Active ($percent%)"
+
+                // Determinar o tipo de captura e formatar as mensagens
+                val captureType = if (device.timeLimitMs > 0) {
+                    // Formatar o tempo limite para uma string legível
+                    val hours = device.timeLimitMs / (1000 * 60 * 60)
+                    val minutes = (device.timeLimitMs % (1000 * 60 * 60)) / (1000 * 60)
+                    val seconds = (device.timeLimitMs % (1000 * 60)) / 1000
+                    String.format("Time Limit (%02d:%02d:%02d)", hours, minutes, seconds)
                 } else {
-                    "Completed (${device.captureProgress}/${device.captureTotal})"
+                    "Number of Packets (${device.captureTotal})"
                 }
 
-                if (!device.capturing) {
-                    btnStopSession.visibility = View.GONE
+                txtSessionStatus.text = if (device.capturing) {
+                    "Active Capture by $captureType ($percent%)"
+                } else {
+                    "Completed: ${if (device.timeLimitMs > 0) "Time Limit Reached" else "Packets Captured (${device.captureProgress}/${device.captureTotal})"}"
                 }
 
                 btnStopSession.visibility = if (device.capturing) View.VISIBLE else View.GONE

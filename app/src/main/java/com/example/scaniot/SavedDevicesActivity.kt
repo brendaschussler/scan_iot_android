@@ -6,6 +6,7 @@ import android.os.Bundle
 import android.text.InputType
 import android.view.LayoutInflater
 import android.view.View
+import android.widget.LinearLayout
 import android.widget.RadioGroup
 import android.widget.Toast
 import androidx.activity.enableEdgeToEdge
@@ -90,19 +91,26 @@ class SavedDevicesActivity : AppCompatActivity() {
         val layoutCaptureValue = dialogView.findViewById<TextInputLayout>(R.id.layoutCaptureValue)
         val editCaptureValue = dialogView.findViewById<TextInputEditText>(R.id.editCaptureValue)
         val editFilename = dialogView.findViewById<TextInputEditText>(R.id.editFilename)
+        val timeInputLayout = dialogView.findViewById<LinearLayout>(R.id.timeInputLayout)
+
+        // Campos de tempo
+        val editHours = dialogView.findViewById<TextInputEditText>(R.id.editHours)
+        val editMinutes = dialogView.findViewById<TextInputEditText>(R.id.editMinutes)
+        val editSeconds = dialogView.findViewById<TextInputEditText>(R.id.editSeconds)
 
         // Configura o listener para mudar o modo
         radioCaptureMode.setOnCheckedChangeListener { _, checkedId ->
             when (checkedId) {
                 R.id.radioPacketCount -> {
+                    layoutCaptureValue.visibility = View.VISIBLE
+                    timeInputLayout.visibility = View.GONE
                     layoutCaptureValue.hint = "Number of packets"
                     editCaptureValue.inputType = InputType.TYPE_CLASS_NUMBER
                     editCaptureValue.setText("1000")
                 }
                 R.id.radioTimeLimit -> {
-                    layoutCaptureValue.hint = "Time limit (hours)"
-                    editCaptureValue.inputType = InputType.TYPE_CLASS_NUMBER or InputType.TYPE_NUMBER_FLAG_DECIMAL
-                    editCaptureValue.setText("0.5")
+                    layoutCaptureValue.visibility = View.GONE
+                    timeInputLayout.visibility = View.VISIBLE
                 }
             }
         }
@@ -112,21 +120,29 @@ class SavedDevicesActivity : AppCompatActivity() {
             .setView(dialogView)
             .setPositiveButton("Start Capture") { _, _ ->
                 var filename = editFilename.text.toString().trim()
-                /*if (!filename.endsWith(PCAP_EXTENSION)) {
-                    filename += PCAP_EXTENSION
-                }*/
-
                 val selectedDevices = savedDevicesAdapter.getSelectedDevices()
 
                 if (radioCaptureMode.checkedRadioButtonId == R.id.radioPacketCount) {
-                    val packetCount = editCaptureValue.text.toString().toIntOrNull()?.coerceAtLeast(1) ?: DEFAULT_PACKET_COUNT
+                    val packetCount = editCaptureValue.text.toString().toIntOrNull() ?: 0
+                    if (packetCount == 0) {
+                        showMessage("Please set at least some time for capture")
+                        return@setPositiveButton
+                    }
                     startCapturedPacketsActivity(selectedDevices, packetCount, 0, filename)
                 } else {
-                    // Converte tanto ponto quanto vírgula para double
-                    val hoursText = editCaptureValue.text.toString()
-                        .replace(',', '.') // Substitui vírgula por ponto
-                    val hours = hoursText.toDoubleOrNull()?.coerceAtLeast(0.1) ?: 0.5
-                    val milliseconds = (hours * 3600 * 1000).toLong()
+                    // Obter valores de horas, minutos e segundos (considerar 0 se vazio)
+                    val hours = editHours.text.toString().toIntOrNull() ?: 0
+                    val minutes = editMinutes.text.toString().toIntOrNull() ?: 0
+                    val seconds = editSeconds.text.toString().toIntOrNull() ?: 0
+
+                    // Validar pelo menos algum tempo foi definido
+                    if (hours == 0 && minutes == 0 && seconds == 0) {
+                        showMessage("Please set at least some time for capture")
+                        return@setPositiveButton
+                    }
+
+                    // Converter para milissegundos
+                    val milliseconds = ((hours * 3600) + (minutes * 60) + seconds) * 1000L
                     startCapturedPacketsActivity(selectedDevices, 0, milliseconds, filename)
                 }
             }
