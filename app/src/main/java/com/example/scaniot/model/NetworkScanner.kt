@@ -13,10 +13,36 @@ import java.io.DataOutputStream
 import java.io.File
 import java.io.InputStreamReader
 import java.net.NetworkInterface
+import okhttp3.OkHttpClient
+import okhttp3.Request
+import org.json.JSONObject
+
+suspend fun getVendorFromMacOnline(mac: String): String = withContext(Dispatchers.IO) {
+    try {
+        val client = OkHttpClient()
+        val request = Request.Builder()
+            .url("https://api.macvendors.com/${mac}")
+            .build()
+
+        client.newCall(request).execute().use { response ->
+            if (response.isSuccessful) {
+                response.body?.string()?.trim() ?: "Unknown"
+            } else {
+                "Unknown"
+            }
+        }
+    } catch (e: Exception) {
+        "Unknown"
+    }
+}
+
 
 class NetworkScanner(private val context: Context) {
 
     private val rootManager = RootManager(context)
+
+    private val macVendorCache = mutableMapOf<String, String>()
+
 
     suspend fun getEnhancedDeviceName(ip: String, hasRootAccess: Boolean): String? {
         return withContext(Dispatchers.IO) {
@@ -40,6 +66,27 @@ class NetworkScanner(private val context: Context) {
             }
         }
     }
+
+    fun lookupMacVendor(mac: String): String {
+        val client = OkHttpClient()
+
+        val request = Request.Builder()
+            .url("https://api.maclookup.app/v2/macs/$mac")
+            .header("User-Agent", "ScanIOTApp")  // OBRIGATÓRIO!
+            .build()
+
+        client.newCall(request).execute().use { response ->
+            if (!response.isSuccessful) {
+                println("Erro na requisição: ${response.code}")
+                return "Unknown Vendor"
+            }
+
+            val body = response.body?.string() ?: return "Unknown Vendor"
+            val json = JSONObject(body)
+            return json.optString("company", "Unknown Vendor")
+        }
+    }
+
 
     private suspend fun getDeviceName(ip: String, hasRootAccess: Boolean): String? = withContext(Dispatchers.IO) {
         // Tentativa 1: nmblookup (mais confiável para Windows/Mac)
@@ -234,7 +281,7 @@ class NetworkScanner(private val context: Context) {
         devicesFound
     }*/
 
-    fun getSelfDeviceInfo(): Device? {
+    /*fun getSelfDeviceInfo(): Device? {
         return try {
             // Obtém o IPv4 do WiFi
             val ipv4 = getWifiIpAddress()
@@ -263,7 +310,7 @@ class NetworkScanner(private val context: Context) {
             null
         }
     }
-
+*/
     private fun getWifiIpAddress(): String? {
         return try {
             @Suppress("DEPRECATION")
@@ -453,17 +500,44 @@ class NetworkScanner(private val context: Context) {
         }
     }
 
-    private fun getVendorFromMac(mac: String): String {
-        // Implementação básica - você pode expandir com um banco de dados OUI mais completo
-        return when {
-            mac.startsWith("00:1A:2B") -> "Samsung"
-            mac.startsWith("00:1B:2C") -> "Xiaomi"
-            mac.startsWith("00:1C:2D") -> "Apple"
-            mac.startsWith("00:1D:2E") -> "Philips"
-            mac.startsWith("00:1E:2F") -> "TP-Link"
-            else -> "Unknown Vendor"
-        }
+    suspend fun getVendorFromMac(mac: String): String {
+
+        val vendor = MacVendorResolver.getVendor(mac)
+        Log.d("MAC", "getVendorFromMac: $vendor")
+
+        return vendor
     }
+
+
+    /*private fun getVendorFromMac(mac: String): String {
+        // Verifica o cache primeiro
+        macVendorCache[mac.uppercase()]?.let {
+            return it
+        }
+
+        // Tenta consultar macvendors.com
+        try {
+            val client = okhttp3.OkHttpClient()
+            val request = okhttp3.Request.Builder()
+                .url("https://api.macvendors.com/$mac")
+                .build()
+
+            val response = client.newCall(request).execute()
+            Log.d("VendorLookup", "Request URL: ${request.url}")
+            Log.d("VendorLookup", "Response code: ${response.code}")
+            if (response.isSuccessful) {
+                val vendor = response.body?.string()?.trim().orEmpty()
+                Log.d("VendorLookup", "Vendor response: $vendor")
+                macVendorCache[mac.uppercase()] = vendor // Armazena no cache
+                return vendor
+            }
+        } catch (e: Exception) {
+            Log.e("MacVendorLookup", "Erro ao consultar macvendors.com", e)
+        }
+
+        return "Unknown Vendor"
+    }*/
+
 
     private fun guessDeviceType(hostname: String): String {
         return when {

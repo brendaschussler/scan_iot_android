@@ -135,6 +135,8 @@ class ScanDevicesActivity : AppCompatActivity() {
     private val scannedDevices = mutableListOf<Device>()
     private lateinit var networkScanner: NetworkScanner
 
+
+
     private val valPermissions = listOf(
         android.Manifest.permission.CAMERA,
         android.Manifest.permission.READ_EXTERNAL_STORAGE,
