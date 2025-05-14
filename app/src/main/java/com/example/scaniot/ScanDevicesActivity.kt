@@ -10,6 +10,8 @@ import android.provider.MediaStore
 import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
+import android.widget.ArrayAdapter
+import android.widget.AutoCompleteTextView
 import android.widget.Button
 import android.widget.ImageView
 import android.widget.Toast
@@ -69,73 +71,8 @@ class ScanDevicesActivity : AppCompatActivity() {
 
     val currentUserId = firebaseAuth.currentUser?.uid ?: ""
 
-    /*val scannedDevices = listOf(
-        Device(
-            ip = "192.168.1.111",
-            mac = "55:1A:2B:3C:4D:95",
-            name = "Smart TV",
-            description = "Samsung 4K UHD Smart TV",
-            vendor = "Samsung",
-            deviceModel = "QN65Q80AAFXZA",
-            deviceLocation = "Living Room",
-            deviceVersion = "T-KT2DEUC-2305.5",
-            deviceType = "television",
-            userId = currentUserId
-        ),
-        Device(
-            ip = "192.168.1.102",
-            mac = "00:1B:2C:3D:4E:5F",
-            name = "My Smartphone",
-            description = "Personal Android Phone",
-            vendor = "Xiaomi",
-            deviceModel = "Redmi Note 10 Pro",
-            deviceLocation = "Bedroom",
-            deviceVersion = "Android 13",
-            deviceType = "smartphone",
-            userId = currentUserId
-        ),
-        Device(
-            ip = "192.168.1.103",
-            mac = "00:1C:2D:3E:4F:5A",
-            name = "Work Laptop",
-            description = "Company issued Macbook",
-            vendor = "Apple",
-            deviceModel = "MacBook Air M2",
-            deviceLocation = "Home Office",
-            deviceVersion = "macOS 14.0",
-            deviceType = "laptop",
-            userId = currentUserId
-        ),
-        Device(
-            ip = "192.168.1.104",
-            mac = "00:1D:2E:3F:4A:5B",
-            name = "Bedroom Light",
-            description = "RGB Smart Bulb",
-            vendor = "Philips",
-            deviceModel = "Hue White and Color",
-            deviceLocation = "Master Bedroom",
-            deviceVersion = "1.93.3",
-            deviceType = "light",
-            userId = currentUserId
-        ),
-        Device(
-            ip = "192.168.1.105",
-            mac = "00:1E:2F:3A:4B:5C",
-            name = "Front Door Camera",
-            description = "Outdoor Security Camera",
-            vendor = "TP-Link",
-            deviceModel = "Tapo C310",
-            deviceLocation = "Front Entrance",
-            deviceVersion = "1.1.9 Build 20230905",
-            deviceType = "camera",
-            userId = currentUserId
-        )
-    )*/
-
     private val scannedDevices = mutableListOf<Device>()
     private lateinit var networkScanner: NetworkScanner
-
-
 
     private val valPermissions = listOf(
         android.Manifest.permission.CAMERA,
@@ -292,14 +229,6 @@ class ScanDevicesActivity : AppCompatActivity() {
             .setPositiveButton("OK", null)
             .show()
     }
-
-
-    /*private fun startScanningDevices() {
-        binding.btnStartScan.setOnClickListener {
-            //loadDevices()
-            loadDevicesWithSavedData()
-        }
-    }*/
 
     private fun startScanningDevices() {
         binding.btnStartScan.setOnClickListener {
@@ -487,6 +416,43 @@ class ScanDevicesActivity : AppCompatActivity() {
         val dialogView = LayoutInflater.from(this).inflate(R.layout.dialog_edit_device, null)
         currentDialogView = dialogView
 
+        // Configurar o AutoCompleteTextView para as categorias
+        val categories = arrayOf(
+            "Smartphone",
+            "Tablet",
+            "Smart TV",
+            "Smart Light",
+            "Smartwatch",
+            "Smart Plug",
+            "Smart Thermostat",
+            "Smart Lock",
+            "Smart Doorbell",
+            "Smart Speaker",
+            "Voice Assistants",
+            "Camera",
+            "Sound System",
+            "Printer",
+            "Game Console",
+            "Wearable",
+            "Smart Appliance",
+            "Router/Access Point",
+            "Network Storage (NAS)",
+            "Vehicle",
+            "Medical Device",
+            "Hub/Gateway",
+            "Sensor",
+            "Other"
+        )
+
+        val adapter = ArrayAdapter(this, android.R.layout.simple_dropdown_item_1line, categories)
+        val categoryInput = dialogView.findViewById<AutoCompleteTextView>(R.id.editCategory)
+        categoryInput.setAdapter(adapter)
+
+        // Definir a categoria atual do dispositivo, se existir
+        device.deviceCategory?.let {
+            categoryInput.setText(it, false)
+        }
+
         dialogView.apply {
             findViewById<TextInputEditText>(R.id.editName).setText(device.name)
             findViewById<TextInputEditText>(R.id.editDescription).setText(device.description)
@@ -521,7 +487,8 @@ class ScanDevicesActivity : AppCompatActivity() {
                     deviceModel = dialogView.findViewById<TextInputEditText>(R.id.editModel).text.toString(),
                     deviceLocation = dialogView.findViewById<TextInputEditText>(R.id.editLocation).text.toString(),
                     deviceVersion = dialogView.findViewById<TextInputEditText>(R.id.editVersion).text.toString(),
-                    deviceType = dialogView.findViewById<TextInputEditText>(R.id.editType).text.toString()
+                    deviceType = dialogView.findViewById<TextInputEditText>(R.id.editType).text.toString(),
+                    deviceCategory = dialogView.findViewById<AutoCompleteTextView>(R.id.editCategory).text.toString()
                 )
                 saveDeviceToUserCollection(editedDevice)
                 loadDevicesWithSavedData()

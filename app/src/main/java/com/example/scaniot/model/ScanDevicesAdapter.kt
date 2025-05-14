@@ -37,6 +37,7 @@ class ScanDevicesAdapter(
                 txtLocation.text = device.deviceLocation
                 txtVersion.text = device.deviceVersion
                 txtType.text = device.deviceType
+                txtCategory.text = device.deviceCategory ?: "Not specified"
                 imgNew.visibility = if (device.isNew) View.VISIBLE else View.GONE
 
                 // Verifica se o dispositivo não está em nenhuma das listas

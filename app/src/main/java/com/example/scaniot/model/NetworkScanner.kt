@@ -205,7 +205,7 @@ class NetworkScanner(private val context: Context) {
                             ip = ip,
                             mac = mac,
                             name = name,
-                            description = "ARP via ip neigh",
+                            description = "Discovered on network",
                             vendor = getVendorFromMac(mac),
                             deviceModel = "Unknown",
                             deviceLocation = "Unknown",

@@ -13,6 +13,7 @@ data class Device(
     var vendor: String = "unknown",
     var deviceModel: String = "unknown",
     var deviceType: String = "unknown",
+    var deviceCategory: String = "unknown",
     var deviceVersion: String = "unknown",
     var deviceLocation: String = "unknown",
     var photoUrl: String? = null,
