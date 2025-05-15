@@ -188,6 +188,28 @@ object CaptureRepository {
         }
     }
 
+    fun isDeviceCapturing(sessionId: String, mac: String, callback: (Boolean) -> Unit) {
+        val userId = auth.currentUser?.uid ?: run {
+            callback(false)
+            return
+        }
+
+        firestore.collection("captured_list")
+            .document(userId)
+            .collection("captures")
+            .document(sessionId)
+            .get()
+            .addOnSuccessListener { document ->
+                val devices = document.get("devices") as? Map<String, Map<String, Any>> ?: emptyMap()
+                val deviceData = devices[mac]
+                val isCapturing = deviceData?.get("capturing") as? Boolean ?: false
+                callback(isCapturing)
+            }
+            .addOnFailureListener {
+                callback(false)
+            }
+    }
+
     private fun showRootRequiredDialog(context: Context, selectedDevices: List<Device>, packetCount: Int, outputFile: String, sessionId: String) {
         AlertDialog.Builder(context)
             .setTitle("Acesso Root Necessário")

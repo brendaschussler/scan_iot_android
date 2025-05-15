@@ -141,8 +141,14 @@ class SavedDevicesActivity : AppCompatActivity() {
                         return@setPositiveButton
                     }
 
+                    val totalSeconds = (hours * 3600) + (minutes * 60) + seconds
+                    if (totalSeconds > 2_147_483) {
+                        Toast.makeText(this, "Total time exceeds maximum limit (596 hours)", Toast.LENGTH_SHORT).show()
+                        return@setPositiveButton
+                    }
+
                     // Converter para milissegundos
-                    val milliseconds = ((hours * 3600) + (minutes * 60) + seconds) * 1000L
+                    val milliseconds = totalSeconds * 1000L
                     startCapturedPacketsActivity(selectedDevices, 0, milliseconds, filename)
                 }
             }

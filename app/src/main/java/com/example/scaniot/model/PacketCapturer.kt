@@ -15,16 +15,21 @@ import java.net.InetAddress
 import java.net.NetworkInterface
 import java.util.Timer
 import java.util.TimerTask
+import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.collections.iterator
 
 class PacketCapturer(private val context: Context) {
+
 
     companion object {
         const val PROGRESS_UPDATE_ACTION = "com.example.scaniot.PROGRESS_UPDATE"
         const val EXTRA_SESSION_ID = "session_id"
         const val EXTRA_PROGRESS = "progress"
         const val EXTRA_TOTAL = "total"
+        val timeCaptureThreads: ConcurrentHashMap<String, Thread> = ConcurrentHashMap()
     }
+
 
     private fun sendDeviceProgressUpdate(sessionId: String, mac: String, progress: Int, total: Int) {
         val intent = Intent(PROGRESS_UPDATE_ACTION).apply {
@@ -100,10 +105,19 @@ class PacketCapturer(private val context: Context) {
         callback(true, "Capture started for all devices")
     }
 
+    //val timeCaptureThreads: ConcurrentHashMap<String, Thread> = ConcurrentHashMap()
+
+
     fun captureByTime(macList: List<String>, timeLimit: Long, outputFile: String, sessionId: String, callback: (Boolean, String) -> Unit) {
+
         macList.forEach { mac ->
 
-            Thread {
+            val key = "${sessionId}_${mac.lowercase()}"
+
+            Log.d("CAPTURE", "Salvando thread com key: $key")
+
+            val captureThread = Thread {
+
                 try {
                     val process = Runtime.getRuntime().exec("su")
                     val outputStream = DataOutputStream(process.outputStream)
@@ -116,10 +130,10 @@ class PacketCapturer(private val context: Context) {
                         val networkPrefix = getNetworkPrefix(localIp)
                         Log.d("TCPDUMP", "NetworkPrefix: $networkPrefix")
                         val cmdIp = "ip -o addr show | grep $networkPrefix"
-                        val process = Runtime.getRuntime().exec(arrayOf("su", "-c", cmdIp))
-                        val reader = process.inputStream.bufferedReader()
+                        val ifaceProcess = Runtime.getRuntime().exec(arrayOf("su", "-c", cmdIp))
+                        val reader = ifaceProcess.inputStream.bufferedReader()
                         val output = reader.readText()
-                        process.waitFor()
+                        ifaceProcess.waitFor()
 
                         val interfaceName = Regex("""^\d+:\s+(\S+)""").find(output)?.groupValues?.get(1)
                         val timeSeconds = timeLimit / 1000
@@ -133,7 +147,11 @@ class PacketCapturer(private val context: Context) {
                         outputStream.writeBytes("exit\n")
                         outputStream.flush()
 
+                        //timeCaptureRunning["${sessionId}_$mac"] = AtomicBoolean(true)
+
+
                         for (i in 1..timeSeconds) {
+
                             Thread.sleep(1000)
                             val elapsedTime = i
                             Log.d("elapsedTime", "elapsedTime: $elapsedTime / $timeSeconds ")
@@ -155,10 +173,18 @@ class PacketCapturer(private val context: Context) {
                     } else {
                         callback(false, "IP não encontrado")
                     }
-                } catch (e: Exception) {
-                    callback(false, "Erro: ${e.message}")
+                } catch (e: InterruptedException) {
+                    Log.d("CAPTURE", "Thread interrompida para $key")
+                } finally {
+                    timeCaptureThreads.remove(key)
+                    //timeCaptureRunning.remove(key)
+                    Log.d("CAPTURE", "Cleanup finalizado para $key")
                 }
-            }.start()
+            }
+            timeCaptureThreads[key] = captureThread
+            Log.d("CAPTURE", "captureThread: $captureThread")
+            Log.d("CAPTURE", "timeCaptureThreads[key]: $timeCaptureThreads[key]")
+            captureThread.start()
 
         }
     }
@@ -191,6 +217,12 @@ class PacketCapturer(private val context: Context) {
     fun stopDeviceCapture(sessionId: String, mac: String): Boolean {
         return try {
 
+            val key = "${sessionId}_${mac.lowercase()}"
+
+            Log.d("STOPPED", "Tentando parar com key: $key")
+
+            val thread = timeCaptureThreads[key]
+
             val killProcess = Runtime.getRuntime().exec("su")
             val killOutputStream = DataOutputStream(killProcess.outputStream)
 
@@ -200,6 +232,13 @@ class PacketCapturer(private val context: Context) {
             killOutputStream.flush()
 
             killProcess.waitFor()
+
+            if (thread != null) {
+                thread.interrupt()
+                Log.d("STOPPED", "Thread interrompida: $thread")
+            } else {
+                Log.d("STOPPED", "⚠Thread não encontrada: $thread")
+            }
 
             true
 
