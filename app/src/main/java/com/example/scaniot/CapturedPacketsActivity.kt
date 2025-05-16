@@ -10,6 +10,7 @@ import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.util.Log
 import android.widget.Toast
 import androidx.activity.enableEdgeToEdge
 import androidx.appcompat.app.AppCompatActivity
@@ -25,6 +26,9 @@ import com.example.scaniot.model.Device
 import com.example.scaniot.model.PacketCapturer
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.ListenerRegistration
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 class CapturedPacketsActivity : AppCompatActivity() {
 
@@ -43,6 +47,7 @@ class CapturedPacketsActivity : AppCompatActivity() {
                     val mac = intent.getStringExtra("mac") ?: return
                     val progress = intent.getIntExtra(PacketCapturer.EXTRA_PROGRESS, 0)
                     val total = intent.getIntExtra(PacketCapturer.EXTRA_TOTAL, 100)
+                    val end = intent.getLongExtra(PacketCapturer.EXTRA_END, System.currentTimeMillis())
 
                     // Update the specific device in the list
                     val currentList = capturedPacketsAdapter.currentList.toMutableList()
@@ -54,6 +59,7 @@ class CapturedPacketsActivity : AppCompatActivity() {
                         val device = currentList[position].copy(
                             captureProgress = progress,
                             captureTotal = total,
+                            endDate = end,
                             capturing = progress < total
                         )
                         currentList[position] = device

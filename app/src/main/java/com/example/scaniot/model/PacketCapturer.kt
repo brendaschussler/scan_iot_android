@@ -13,6 +13,9 @@ import androidx.appcompat.app.AppCompatActivity
 import java.io.DataOutputStream
 import java.net.InetAddress
 import java.net.NetworkInterface
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 import java.util.Timer
 import java.util.TimerTask
 import java.util.concurrent.ConcurrentHashMap
@@ -27,15 +30,18 @@ class PacketCapturer(private val context: Context) {
         const val EXTRA_SESSION_ID = "session_id"
         const val EXTRA_PROGRESS = "progress"
         const val EXTRA_TOTAL = "total"
+        const val EXTRA_END = "end"
         val timeCaptureThreads: ConcurrentHashMap<String, Thread> = ConcurrentHashMap()
     }
 
 
-    private fun sendDeviceProgressUpdate(sessionId: String, mac: String, progress: Int, total: Int) {
+    private fun sendDeviceProgressUpdate(sessionId: String, mac: String, progress: Int, total: Int, end: Long) {
+        val dateFormat = SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.getDefault())
         val intent = Intent(PROGRESS_UPDATE_ACTION).apply {
             putExtra(EXTRA_SESSION_ID, sessionId) // Combine sessionId and mac
             putExtra(EXTRA_PROGRESS, progress)
             putExtra(EXTRA_TOTAL, total)
+            putExtra(EXTRA_END, end)
             putExtra("mac", mac) // Add MAC as separate extra
         }
         context.sendBroadcast(intent)
@@ -77,7 +83,7 @@ class PacketCapturer(private val context: Context) {
                                         progressRegex.find(line)?.groupValues?.get(1)?.toIntOrNull()?.let { count ->
                                             Log.d("TCPDUMP", "$count / $packetCount")
                                             CaptureRepository.updateDeviceCaptureProgress(sessionId, mac, count, packetCount)
-                                            sendDeviceProgressUpdate(sessionId, mac, count, packetCount)
+                                            sendDeviceProgressUpdate(sessionId, mac, count, packetCount, System.currentTimeMillis())
                                         }
 
                                         completionRegex.find(line)?.groupValues?.get(1)?.toIntOrNull()?.let { captured ->
@@ -85,7 +91,7 @@ class PacketCapturer(private val context: Context) {
                                                 Log.d("TCPDUMP", "$captured / $packetCount")
                                                 CaptureRepository.updateDeviceCaptureProgress(sessionId, mac, packetCount, packetCount)
                                                 CaptureRepository.updateDeviceCaptureState(sessionId, mac, false)
-                                                sendDeviceProgressUpdate(sessionId, mac, captured, packetCount)
+                                                sendDeviceProgressUpdate(sessionId, mac, captured, packetCount, System.currentTimeMillis())
                                             }
                                         }
                                     }
@@ -156,14 +162,14 @@ class PacketCapturer(private val context: Context) {
                             val elapsedTime = i
                             Log.d("elapsedTime", "elapsedTime: $elapsedTime / $timeSeconds ")
                             CaptureRepository.updateDeviceCaptureProgress(sessionId, mac, elapsedTime.toInt(), timeSeconds.toInt())
-                            sendDeviceProgressUpdate(sessionId, mac, elapsedTime.toInt(), timeSeconds.toInt())
+                            sendDeviceProgressUpdate(sessionId, mac, elapsedTime.toInt(), timeSeconds.toInt(), System.currentTimeMillis())
 
                             if (elapsedTime >= timeSeconds){
                                 CaptureRepository.updateCaptureState(sessionId, false)
                                 Log.d("elapsedTime", "FINALIZOU: elapsedTime: $i / $timeSeconds ")
                                 CaptureRepository.updateDeviceCaptureProgress(sessionId, mac, elapsedTime.toInt(), elapsedTime.toInt())
                                 CaptureRepository.updateDeviceCaptureState(sessionId, mac, false)
-                                sendDeviceProgressUpdate(sessionId, mac, elapsedTime.toInt(), elapsedTime.toInt())
+                                sendDeviceProgressUpdate(sessionId, mac, elapsedTime.toInt(), elapsedTime.toInt(), System.currentTimeMillis())
                             }
                         }
 

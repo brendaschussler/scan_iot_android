@@ -23,6 +23,7 @@ data class Device(
     val captureTotal: Int = 100,
     var timeLimitMs: Long = 0,
     val lastCaptureTimestamp: Long? = null,
+    val endDate: Long? = null,
     var isSaved: Boolean = false,
     var isNew: Boolean = false,
     val sessionId: String = "",

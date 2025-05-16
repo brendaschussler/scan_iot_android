@@ -2,6 +2,7 @@
 package com.example.scaniot.model
 
 import android.app.AlertDialog
+import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -37,7 +38,16 @@ class CapturedPacketsAdapter : ListAdapter<Device, CapturedPacketsAdapter.Device
             binding.apply {
                 val dateFormat = SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.getDefault())
                 if(device.lastCaptureTimestamp != null){
-                    txtSessionDate.text = dateFormat.format(Date(device.lastCaptureTimestamp))
+                    txtSessionStartDate.text = "Started: ${dateFormat.format(Date(device.lastCaptureTimestamp))}"
+                }
+
+                if (device.endDate != null) {
+                    if (device.capturing) {
+                        txtSessionEndDate.visibility = View.GONE
+                    } else {
+                        txtSessionEndDate.visibility = View.VISIBLE
+                        txtSessionEndDate.text = "Finished: ${dateFormat.format(Date(device.endDate))}"
+                    }
                 }
 
                 txtSessionId.text = "Device: ${device.name}"
@@ -72,6 +82,8 @@ class CapturedPacketsAdapter : ListAdapter<Device, CapturedPacketsAdapter.Device
                 }
 
                 btnStopSession.visibility = if (device.capturing) View.VISIBLE else View.GONE
+
+
 
                 btnStopSession.setOnClickListener {
                     stopDeviceCapture(device)
