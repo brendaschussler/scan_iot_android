@@ -31,17 +31,19 @@ class PacketCapturer(private val context: Context) {
         const val EXTRA_PROGRESS = "progress"
         const val EXTRA_TOTAL = "total"
         const val EXTRA_END = "end"
+        const val EXTRA_FILENAME = "filename"
         val timeCaptureThreads: ConcurrentHashMap<String, Thread> = ConcurrentHashMap()
     }
 
 
-    private fun sendDeviceProgressUpdate(sessionId: String, mac: String, progress: Int, total: Int, end: Long) {
+    private fun sendDeviceProgressUpdate(sessionId: String, mac: String, progress: Int, total: Int, end: Long, filename: String) {
         val dateFormat = SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.getDefault())
         val intent = Intent(PROGRESS_UPDATE_ACTION).apply {
             putExtra(EXTRA_SESSION_ID, sessionId) // Combine sessionId and mac
             putExtra(EXTRA_PROGRESS, progress)
             putExtra(EXTRA_TOTAL, total)
             putExtra(EXTRA_END, end)
+            putExtra(EXTRA_FILENAME, filename)
             putExtra("mac", mac) // Add MAC as separate extra
         }
         context.sendBroadcast(intent)
@@ -82,16 +84,16 @@ class PacketCapturer(private val context: Context) {
                                     reader.forEachLine { line ->
                                         progressRegex.find(line)?.groupValues?.get(1)?.toIntOrNull()?.let { count ->
                                             Log.d("TCPDUMP", "$count / $packetCount")
-                                            CaptureRepository.updateDeviceCaptureProgress(sessionId, mac, count, packetCount)
-                                            sendDeviceProgressUpdate(sessionId, mac, count, packetCount, System.currentTimeMillis())
+                                            CaptureRepository.updateDeviceCaptureProgress(sessionId, mac, count, packetCount, System.currentTimeMillis(), outputFile )
+                                            sendDeviceProgressUpdate(sessionId, mac, count, packetCount, System.currentTimeMillis(), outputFile)
                                         }
 
                                         completionRegex.find(line)?.groupValues?.get(1)?.toIntOrNull()?.let { captured ->
                                             if (captured >= packetCount) {
                                                 Log.d("TCPDUMP", "$captured / $packetCount")
-                                                CaptureRepository.updateDeviceCaptureProgress(sessionId, mac, packetCount, packetCount)
+                                                CaptureRepository.updateDeviceCaptureProgress(sessionId, mac, packetCount, packetCount, System.currentTimeMillis(), outputFile)
                                                 CaptureRepository.updateDeviceCaptureState(sessionId, mac, false)
-                                                sendDeviceProgressUpdate(sessionId, mac, captured, packetCount, System.currentTimeMillis())
+                                                sendDeviceProgressUpdate(sessionId, mac, captured, packetCount, System.currentTimeMillis(), outputFile)
                                             }
                                         }
                                     }
@@ -161,15 +163,15 @@ class PacketCapturer(private val context: Context) {
                             Thread.sleep(1000)
                             val elapsedTime = i
                             Log.d("elapsedTime", "elapsedTime: $elapsedTime / $timeSeconds ")
-                            CaptureRepository.updateDeviceCaptureProgress(sessionId, mac, elapsedTime.toInt(), timeSeconds.toInt())
-                            sendDeviceProgressUpdate(sessionId, mac, elapsedTime.toInt(), timeSeconds.toInt(), System.currentTimeMillis())
+                            CaptureRepository.updateDeviceCaptureProgress(sessionId, mac, elapsedTime.toInt(), timeSeconds.toInt(), System.currentTimeMillis(), outputFile)
+                            sendDeviceProgressUpdate(sessionId, mac, elapsedTime.toInt(), timeSeconds.toInt(), System.currentTimeMillis(), outputFile)
 
                             if (elapsedTime >= timeSeconds){
                                 CaptureRepository.updateCaptureState(sessionId, false)
                                 Log.d("elapsedTime", "FINALIZOU: elapsedTime: $i / $timeSeconds ")
-                                CaptureRepository.updateDeviceCaptureProgress(sessionId, mac, elapsedTime.toInt(), elapsedTime.toInt())
+                                CaptureRepository.updateDeviceCaptureProgress(sessionId, mac, elapsedTime.toInt(), elapsedTime.toInt(), System.currentTimeMillis(), outputFile)
                                 CaptureRepository.updateDeviceCaptureState(sessionId, mac, false)
-                                sendDeviceProgressUpdate(sessionId, mac, elapsedTime.toInt(), elapsedTime.toInt(), System.currentTimeMillis())
+                                sendDeviceProgressUpdate(sessionId, mac, elapsedTime.toInt(), elapsedTime.toInt(), System.currentTimeMillis(), outputFile)
                             }
                         }
 

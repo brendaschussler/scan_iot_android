@@ -24,6 +24,7 @@ data class Device(
     var timeLimitMs: Long = 0,
     val lastCaptureTimestamp: Long? = null,
     val endDate: Long? = null,
+    val filename: String = "",
     var isSaved: Boolean = false,
     var isNew: Boolean = false,
     val sessionId: String = "",

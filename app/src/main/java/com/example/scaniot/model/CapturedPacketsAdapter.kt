@@ -52,7 +52,7 @@ class CapturedPacketsAdapter : ListAdapter<Device, CapturedPacketsAdapter.Device
 
                 txtSessionId.text = "Device: ${device.name}"
                 txtDevicesCount.text = "MAC: ${device.mac}"
-                txtCaptureType.text = "Capture Session: ${device.sessionId}"
+                txtCaptureType.text = "Output Filename: ${device.filename}_${device.mac}_${device.sessionId}"
                 //txtCaptureType.text = "Type: ${if (device.timeLimitMs > 0) "TIME LIMIT" else "PACKET COUNT"}"
 
                 progressBarSession.max = device.captureTotal

@@ -48,6 +48,7 @@ class CapturedPacketsActivity : AppCompatActivity() {
                     val progress = intent.getIntExtra(PacketCapturer.EXTRA_PROGRESS, 0)
                     val total = intent.getIntExtra(PacketCapturer.EXTRA_TOTAL, 100)
                     val end = intent.getLongExtra(PacketCapturer.EXTRA_END, System.currentTimeMillis())
+                    val filename = intent.getStringExtra(PacketCapturer.EXTRA_FILENAME) ?: return
 
                     // Update the specific device in the list
                     val currentList = capturedPacketsAdapter.currentList.toMutableList()
@@ -60,6 +61,7 @@ class CapturedPacketsActivity : AppCompatActivity() {
                             captureProgress = progress,
                             captureTotal = total,
                             endDate = end,
+                            filename = filename,
                             capturing = progress < total
                         )
                         currentList[position] = device

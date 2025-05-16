@@ -37,6 +37,8 @@ object CaptureRepository {
                     val captureProgress = (doc.getLong("captureProgress") ?: 0).toInt()
                     val captureTotal = (doc.getLong("captureTotal") ?: 100).toInt()
                     val timeLimitMs = doc.getLong("timeLimitMs") ?: 0
+                    val endDate = doc.getLong("endDate")
+                    val filename = doc.getString("filename") ?: ""
                     val lastCaptureTimestamp = doc.getLong("lastCaptureTimestamp")
 
                     val devices = devicesMap.map { (mac, deviceData) ->
@@ -53,7 +55,9 @@ object CaptureRepository {
                             deviceModel = deviceData["deviceModel"] as? String ?: "",
                             deviceLocation = deviceData["deviceLocation"] as? String ?: "",
                             sessionId = sessionId,
-                            sessionTimestamp = timestamp
+                            sessionTimestamp = timestamp,
+                            filename = deviceData["filename"] as? String ?: "",
+                            endDate = deviceData["endDate"] as? Long
                         )
                     }
 
@@ -100,7 +104,9 @@ object CaptureRepository {
                 "deviceModel" to device.deviceModel,
                 "deviceLocation" to device.deviceLocation,
                 "sessionId" to sessionId,
-                "sessionTimestamp" to timestamp
+                "sessionTimestamp" to timestamp,
+                "filename" to device.filename,
+                "endDate" to device.endDate
             )
         }
 
@@ -301,7 +307,7 @@ object CaptureRepository {
             .update("isActive", isActive)
     }
 
-    fun updateDeviceCaptureProgress(sessionId: String, mac: String, progress: Int, total: Int) {
+    fun updateDeviceCaptureProgress(sessionId: String, mac: String, progress: Int, total: Int, endDate: Long, filename: String) {
         val userId = auth.currentUser?.uid ?: return
 
         firestore.collection("captured_list")
@@ -311,8 +317,10 @@ object CaptureRepository {
             .update(
                 "devices.$mac.captureProgress", progress,
                 "devices.$mac.captureTotal", total,
+                "devices.$mac.endDate", endDate,
+                "devices.$mac.filename", filename,
                 "devices.$mac.capturing", (progress < total),
-                "lastUpdated", FieldValue.serverTimestamp()
+                "lastUpdated", FieldValue.serverTimestamp(),
             )
     }
 
