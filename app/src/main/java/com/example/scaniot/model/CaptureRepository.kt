@@ -9,6 +9,9 @@ import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.ListenerRegistration
 import com.google.firebase.firestore.Query
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.tasks.await
+import kotlinx.coroutines.withContext
 
 object CaptureRepository {
     private val firestore by lazy { FirebaseFirestore.getInstance() }
@@ -295,6 +298,40 @@ object CaptureRepository {
                     doc.reference.delete()
                 }
             }
+    }
+
+
+    // Adicione esta função suspensa no CaptureRepository
+    suspend fun suspendDeleteDeviceCapture(sessionId: String, mac: String): Boolean = withContext(Dispatchers.IO) {
+        try {
+            val userId = FirebaseAuth.getInstance().currentUser?.uid ?: return@withContext false
+
+            // Primeiro deleta o dispositivo
+            firestore.collection("captured_list")
+                .document(userId)
+                .collection("captures")
+                .document(sessionId)
+                .update(
+                    "devices.$mac", FieldValue.delete(),
+                    "lastUpdated", FieldValue.serverTimestamp()
+                ).await() // Usando await() em vez de callbacks
+
+            // Verifica se a sessão ficou vazia
+            val doc = firestore.collection("captured_list")
+                .document(userId)
+                .collection("captures")
+                .document(sessionId)
+                .get().await()
+
+            val devices = doc.get("devices") as? Map<*, *>
+            if (devices.isNullOrEmpty()) {
+                doc.reference.delete().await()
+            }
+
+            true
+        } catch (e: Exception) {
+            false
+        }
     }
 
     fun updateCaptureState(sessionId: String, isActive: Boolean) {

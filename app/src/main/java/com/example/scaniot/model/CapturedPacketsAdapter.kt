@@ -7,10 +7,17 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.Toast
+import androidx.lifecycle.LifecycleOwner
+import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.ListAdapter
 import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.RecyclerView
 import com.example.scaniot.databinding.ItemCapturedSessionBinding
+import com.example.scaniot.model.CaptureRepository.suspendDeleteDeviceCapture
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -123,18 +130,71 @@ class CapturedPacketsAdapter : ListAdapter<Device, CapturedPacketsAdapter.Device
                 .show()
         }
 
+        /*private fun deleteDevice(device: Device) {
+            AlertDialog.Builder(binding.root.context)
+                .setTitle("Delete Device")
+                .setMessage("Delete capture data for ${device.name}?")
+                .setNegativeButton("Cancel") { dialog, _ -> dialog.dismiss() }
+                .setPositiveButton("Delete") { _, _ ->
+
+                    (binding.root.context as? LifecycleOwner)?.lifecycleScope?.launch {
+                        try {
+                            withContext(Dispatchers.IO) {
+                                CaptureRepository.deleteDeviceCapture(device.sessionId, device.mac) { success ->
+                                    if (success) {
+                                        // Remove da lista local
+                                        val newList = currentList.toMutableList().apply { removeAt(adapterPosition) }
+                                        submitList(newList)
+                                        Toast.makeText(binding.root.context, "Capture deleted", Toast.LENGTH_SHORT).show()
+                                    }
+                                }
+                            }
+                        } catch (e: Exception) {
+                            Log.e("CapturedPacketsAdapter", "Error deleting device", e)
+                            Toast.makeText(binding.root.context, "Error deleting capture", Toast.LENGTH_SHORT).show()
+                        }
+                    }
+                }
+                .show()
+        }*/
+
+
         private fun deleteDevice(device: Device) {
             AlertDialog.Builder(binding.root.context)
                 .setTitle("Delete Device")
                 .setMessage("Delete capture data for ${device.name}?")
                 .setNegativeButton("Cancel") { dialog, _ -> dialog.dismiss() }
                 .setPositiveButton("Delete") { _, _ ->
-                    CaptureRepository.deleteDeviceCapture(device.sessionId, device.mac) { success ->
-                        if (success) {
-                            // Remove da lista local
-                            val newList = currentList.toMutableList().apply { removeAt(adapterPosition) }
-                            submitList(newList)
-                            Toast.makeText(binding.root.context, "Capture deleted", Toast.LENGTH_SHORT).show()
+                    // Iniciar uma corrotina para a operação de delete
+                    CoroutineScope(Dispatchers.IO).launch {
+                        try {
+                            val success = withContext(Dispatchers.IO) {
+                                // Chamada suspensa para a operação de delete
+                                suspendDeleteDeviceCapture(device.sessionId, device.mac)
+                            }
+
+                            withContext(Dispatchers.Main) {
+                                if (success) {
+                                    // Remove da lista local
+                                    val newList = currentList.toMutableList().apply {
+                                        removeAt(adapterPosition)
+                                    }
+                                    submitList(newList)
+                                    Toast.makeText(
+                                        binding.root.context,
+                                        "Capture deleted",
+                                        Toast.LENGTH_SHORT
+                                    ).show()
+                                }
+                            }
+                        } catch (e: Exception) {
+                            withContext(Dispatchers.Main) {
+                                Toast.makeText(
+                                    binding.root.context,
+                                    "Error deleting capture: ${e.message}",
+                                    Toast.LENGTH_SHORT
+                                ).show()
+                            }
                         }
                     }
                 }
