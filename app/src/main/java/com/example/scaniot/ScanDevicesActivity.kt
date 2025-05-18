@@ -2,6 +2,7 @@ package com.example.scaniot
 
 import android.app.AlertDialog
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.net.Uri
 import android.os.Build
@@ -418,29 +419,30 @@ class ScanDevicesActivity : AppCompatActivity() {
 
         // Configurar o AutoCompleteTextView para as categorias
         val categories = arrayOf(
-            "Smartphone",
-            "Tablet",
-            "Smart TV",
-            "Smart Light",
-            "Smartwatch",
-            "Smart Plug",
-            "Smart Thermostat",
-            "Smart Lock",
-            "Smart Doorbell",
-            "Smart Speaker",
-            "Voice Assistants",
             "Camera",
-            "Sound System",
-            "Printer",
             "Game Console",
-            "Wearable",
-            "Smart Appliance",
-            "Router/Access Point",
-            "Network Storage (NAS)",
-            "Vehicle",
-            "Medical Device",
             "Hub/Gateway",
+            "Laptop",
+            "Medical Device",
+            "Network Storage (NAS)",
+            "Printer",
+            "Router/Access Point",
             "Sensor",
+            "Smart Appliance",
+            "Smart Doorbell",
+            "Smart Light",
+            "Smart Lock",
+            "Smart Plug",
+            "Smart Speaker",
+            "Smart Thermostat",
+            "Smart TV",
+            "Smartwatch",
+            "Smartphone",
+            "Sound System",
+            "Tablet",
+            "Vehicle",
+            "Voice Assistants",
+            "Wearable",
             "Other"
         )
 
@@ -469,10 +471,16 @@ class ScanDevicesActivity : AppCompatActivity() {
 
         dialogView.findViewById<Button>(R.id.btnOpenCamera).setOnClickListener {
             val cameraIntent = Intent(MediaStore.ACTION_IMAGE_CAPTURE)
-            if (cameraIntent.resolveActivity(packageManager) != null) {
+            val activities = packageManager.queryIntentActivities(cameraIntent, PackageManager.MATCH_ALL)
+
+            if (activities.isNotEmpty()) {
+                // Se houver apps, tente abrir a câmera
                 openCameraLauncher.launch(cameraIntent)
             } else {
-                Toast.makeText(this, "No camera app found", Toast.LENGTH_SHORT).show()
+                // Se não houver, mostre uma lista dos pacotes (para debug)
+                val packagesList = activities.joinToString { it.activityInfo.packageName }
+                Log.d("CameraDebug", "Available camera apps: $packagesList")
+                Toast.makeText(this, "No camera app available", Toast.LENGTH_LONG).show()
             }
         }
 
