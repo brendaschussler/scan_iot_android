@@ -28,5 +28,6 @@ data class Device(
     var isSaved: Boolean = false,
     var isNew: Boolean = false,
     val sessionId: String = "",
-    val sessionTimestamp: Long = 0L
+    val sessionTimestamp: Long = 0L,
+    val downloadUrl: String? = null
 ) : Parcelable

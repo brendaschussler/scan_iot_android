@@ -26,6 +26,8 @@ import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.storage.FirebaseStorage
 import com.example.scaniot.model.PacketCapturer
+import com.example.scaniot.utils.RootUtils
+import com.example.scaniot.utils.TcpdumpUtils
 
 class SavedDevicesActivity : AppCompatActivity() {
 
@@ -125,10 +127,11 @@ class SavedDevicesActivity : AppCompatActivity() {
                 if (radioCaptureMode.checkedRadioButtonId == R.id.radioPacketCount) {
                     val packetCount = editCaptureValue.text.toString().toIntOrNull() ?: 0
                     if (packetCount == 0) {
-                        showMessage("Please set at least some time for capture")
+                        showMessage("Please set a number of packages greater than zero")
                         return@setPositiveButton
                     }
-                    startCapturedPacketsActivity(selectedDevices, packetCount, 0, filename)
+                    checkRootAndStartCapture(selectedDevices, packetCount, 0, filename)
+                    //startCapturedPacketsActivity(selectedDevices, packetCount, 0, filename)
                 } else {
                     // Obter valores de horas, minutos e segundos (considerar 0 se vazio)
                     val hours = editHours.text.toString().toIntOrNull() ?: 0
@@ -149,10 +152,74 @@ class SavedDevicesActivity : AppCompatActivity() {
 
                     // Converter para milissegundos
                     val milliseconds = totalSeconds * 1000L
-                    startCapturedPacketsActivity(selectedDevices, 0, milliseconds, filename)
+
+                    checkRootAndStartCaptureByTime(selectedDevices, 0, milliseconds, filename)
+                    //startCapturedPacketsActivity(selectedDevices, 0, milliseconds, filename)
                 }
             }
             .setNegativeButton("Cancel", null)
+            .show()
+    }
+
+    private fun checkRootAndStartCapture(
+        devices: List<Device>,
+        packetCount: Int,
+        timeLimitMs: Long,
+        filename: String
+    ) {
+        RootUtils.checkRootAccess(this) { hasRoot ->
+            if (hasRoot) {
+                TcpdumpUtils.checkTcpdumpAvailable(this) { isInstalled ->
+                    if (isInstalled) {
+                        startCapturedPacketsActivity(devices, packetCount, timeLimitMs, filename)
+                    } else {
+                        showTcpdumpMessage()
+                    }
+                }
+            }
+        }
+    }
+
+    private fun checkRootAndStartCaptureByTime(
+        devices: List<Device>,
+        packetCount: Int,
+        timeLimitMs: Long,
+        filename: String
+    ) {
+        RootUtils.checkRootAccess(this) { hasRoot ->
+            if (hasRoot) {
+                TcpdumpUtils.checkTcpdumpAvailable(this) { isAvailable ->
+                    if (isAvailable) {
+                        TcpdumpUtils.checkTimeoutInstalled(this) { isInstalled ->
+                            if(isInstalled){
+                                startCapturedPacketsActivity(devices, packetCount, timeLimitMs, filename)
+                            } else {
+                                showTimeoutMessage()
+                            }
+                        }
+                    } else {
+                        showTcpdumpMessage()
+                    }
+                }
+            }
+        }
+    }
+
+    private fun showTimeoutMessage() {
+        AlertDialog.Builder(this)
+            .setTitle("Timeout is not installed\n")
+            .setMessage("timeout is required for packet capture by time limit. Please install it by following the tutorial at link")
+            .setPositiveButton("Ok") { _, _ ->
+            }
+            .show()
+    }
+
+    private fun showTcpdumpMessage() {
+        AlertDialog.Builder(this)
+            .setTitle("Tcpdump is not installed\n")
+            .setMessage("tcpdump is required for packet capture by time limit. Please install it by following the tutorial at link")
+            .setPositiveButton("Ok") { _, _ ->
+            }
             .show()
     }
 

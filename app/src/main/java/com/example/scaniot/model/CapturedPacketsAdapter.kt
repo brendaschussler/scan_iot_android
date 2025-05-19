@@ -1,7 +1,8 @@
-// CapturedPacketsAdapter.kt
 package com.example.scaniot.model
 
 import android.app.AlertDialog
+import android.os.Handler
+import android.os.Looper
 import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
@@ -14,6 +15,7 @@ import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.RecyclerView
 import com.example.scaniot.databinding.ItemCapturedSessionBinding
 import com.example.scaniot.model.CaptureRepository.suspendDeleteDeviceCapture
+import com.example.scaniot.utils.RootUtils
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -108,56 +110,51 @@ class CapturedPacketsAdapter : ListAdapter<Device, CapturedPacketsAdapter.Device
                 .setNegativeButton("Cancel") { dialog, _ -> dialog.dismiss() }
                 .setPositiveButton("Stop") { _, _ ->
 
-                    val packetCapturer = PacketCapturer(binding.root.context)
-                    packetCapturer.stopDeviceCapture(device.sessionId, device.mac)
-
-                    CaptureRepository.updateDeviceCaptureState(device.sessionId, device.mac, false)
-
-                    //Update UI
-                    val currentList = currentList.toMutableList()
-                    val position = currentList.indexOfFirst {
-                        it.mac == device.mac && it.sessionId == device.sessionId
+                    RootUtils.checkRootAccess(binding.root.context) { hasRoot ->
+                        if (hasRoot) {
+                            executeStopCapture(device)
+                        } else {
+                            // Mensagem de erro já é mostrada pelo RootUtils
+                        }
                     }
 
-                    if (position != -1) {
-                        val updatedDevice = currentList[position].copy(
-                            capturing = false
-                        )
-                        currentList[position] = updatedDevice
-                        submitList(currentList)
-                    }
                 }
                 .show()
         }
 
-        /*private fun deleteDevice(device: Device) {
-            AlertDialog.Builder(binding.root.context)
-                .setTitle("Delete Device")
-                .setMessage("Delete capture data for ${device.name}?")
-                .setNegativeButton("Cancel") { dialog, _ -> dialog.dismiss() }
-                .setPositiveButton("Delete") { _, _ ->
+        private fun executeStopCapture(device: Device) {
+            // 1. Primeiro atualiza a UI imediatamente (feedback visual rápido)
+            val currentList = currentList.toMutableList()
+            val position = currentList.indexOfFirst { it.mac == device.mac && it.sessionId == device.sessionId }
 
-                    (binding.root.context as? LifecycleOwner)?.lifecycleScope?.launch {
-                        try {
-                            withContext(Dispatchers.IO) {
-                                CaptureRepository.deleteDeviceCapture(device.sessionId, device.mac) { success ->
-                                    if (success) {
-                                        // Remove da lista local
-                                        val newList = currentList.toMutableList().apply { removeAt(adapterPosition) }
-                                        submitList(newList)
-                                        Toast.makeText(binding.root.context, "Capture deleted", Toast.LENGTH_SHORT).show()
-                                    }
-                                }
-                            }
-                        } catch (e: Exception) {
-                            Log.e("CapturedPacketsAdapter", "Error deleting device", e)
-                            Toast.makeText(binding.root.context, "Error deleting capture", Toast.LENGTH_SHORT).show()
-                        }
+            if (position != -1) {
+                val updatedDevice = currentList[position].copy(capturing = false)
+                currentList[position] = updatedDevice
+                submitList(currentList)
+                notifyItemChanged(position) // Força a atualização do item específico
+            }
+
+            // 2. Depois executa as operações em background
+            Thread {
+                // Operações de I/O (banco de dados e rede)
+                val packetCapturer = PacketCapturer(binding.root.context)
+                packetCapturer.stopDeviceCapture(device.sessionId, device.mac)
+                CaptureRepository.updateDeviceCaptureState(device.sessionId, device.mac, false)
+
+                // 3. Verificação final para garantir consistência
+                Handler(Looper.getMainLooper()).post {
+                    // Atualiza novamente para garantir sincronização
+                    val freshList = currentList.toMutableList()
+                    val freshPosition = freshList.indexOfFirst { it.mac == device.mac && it.sessionId == device.sessionId }
+
+                    if (freshPosition != -1) {
+                        val finalDevice = freshList[freshPosition].copy(capturing = false)
+                        freshList[freshPosition] = finalDevice
+                        submitList(freshList)
                     }
                 }
-                .show()
-        }*/
-
+            }.start()
+        }
 
         private fun deleteDevice(device: Device) {
             AlertDialog.Builder(binding.root.context)
@@ -204,7 +201,9 @@ class CapturedPacketsAdapter : ListAdapter<Device, CapturedPacketsAdapter.Device
 
     private class DeviceDiffCallback : DiffUtil.ItemCallback<Device>() {
         override fun areItemsTheSame(oldItem: Device, newItem: Device): Boolean {
-            return oldItem.mac == newItem.mac && oldItem.sessionId == newItem.sessionId
+            return oldItem.mac == newItem.mac &&
+                   oldItem.sessionId == newItem.sessionId &&
+                   oldItem.capturing == newItem.capturing
         }
 
         override fun areContentsTheSame(oldItem: Device, newItem: Device): Boolean {

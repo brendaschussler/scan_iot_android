@@ -27,8 +27,8 @@ import com.example.scaniot.databinding.ActivityScanDevicesBinding
 import com.example.scaniot.helper.Permissions
 import com.example.scaniot.model.Device
 import com.example.scaniot.model.NetworkScanner
-import com.example.scaniot.model.RootManager
 import com.example.scaniot.model.ScanDevicesAdapter
+import com.example.scaniot.utils.RootUtils
 import com.google.android.material.textfield.TextInputEditText
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
@@ -54,9 +54,6 @@ class ScanDevicesActivity : AppCompatActivity() {
     private var currentDialogView: View? = null
 
     private var scannedNotSavedDevices = mutableListOf<Device>()
-
-    private lateinit var rootManager: RootManager
-    private var rootAccessGranted = false
 
     private val firebaseAuth by lazy {
         FirebaseAuth.getInstance()
@@ -98,7 +95,7 @@ class ScanDevicesActivity : AppCompatActivity() {
 
         initializeToolbar()
         setupRecyclerView()
-        startScanningDevices()
+        initializeClickEvents()
 
         openGalleryLauncher = registerForActivityResult(ActivityResultContracts.GetContent()) { uri ->
             if (uri != null) {
@@ -120,7 +117,7 @@ class ScanDevicesActivity : AppCompatActivity() {
 
                 bitmap?.let {
                     bitmapSelectedImage = it
-                    uriSelectedImage = null // Limpa a URI se houver
+                    uriSelectedImage = null
                     currentDialogView?.findViewById<ImageView>(R.id.selectedImageDevice)?.setImageBitmap(it)
                 }
             }
@@ -129,8 +126,6 @@ class ScanDevicesActivity : AppCompatActivity() {
         networkScanner = NetworkScanner(this)
         binding.progressBarCircular.visibility = View.GONE
 
-        rootManager = RootManager(this)
-        //checkRootStatus()
 
         ViewCompat.setOnApplyWindowInsetsListener(findViewById(R.id.main)) { v, insets ->
             val systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
@@ -139,138 +134,55 @@ class ScanDevicesActivity : AppCompatActivity() {
         }
     }
 
-    private fun checkRootStatus() {
-        if (!rootManager.isDeviceRooted()) {
-            showDeviceNotRootedWarning()
-            return
-        }
-
-        if (rootManager.isDeviceRooted()){
-            rootManager.installNetworkToolsIfNeeded()
-        }
-
-        CoroutineScope(Dispatchers.Main).launch {
-            if (rootManager.wasRootDenied()) {
-                showRootDeniedMessage()
-            } else {
-                verifyRootAccess()
-            }
-        }
-    }
-
-    private suspend fun verifyRootAccess() {
-        binding.progressBarCircular.visibility = View.GONE
-
-        try {
-            rootAccessGranted = rootManager.hasRootAccess()
-
-            if (!rootAccessGranted) {
-                requestRootPermission()
-            } else {
-                Toast.makeText(this@ScanDevicesActivity,
-                    "Permissão root já concedida", Toast.LENGTH_SHORT).show()
-            }
-        } catch (e: Exception) {
-
-        } finally {
-            binding.progressBarCircular.visibility = View.GONE
-        }
-    }
-
-    private fun requestRootPermission() {
-        AlertDialog.Builder(this)
-            .setTitle("Permissão Root Necessária")
-            .setMessage("Para obter endereços MAC completos")
-            .setPositiveButton("Conceder") { _, _ ->
-                CoroutineScope(Dispatchers.Main).launch {
-                    grantRootPermission()
-                }
-            }
-            .setNegativeButton("Recusar") { _, _ ->
-                rootManager.setRootDenied(true)
-                showRootDeniedMessage()
-            }
-            .setCancelable(false)
-            .show()
-    }
-
-    private suspend fun grantRootPermission() {
-        binding.progressBarCircular.visibility = View.VISIBLE
-        try {
-            val success = rootManager.executeRootCommand("echo 'Teste'") != null
-            rootAccessGranted = success
-
-            if (success) {
-                rootManager.setRootDenied(false)
-                Toast.makeText(this@ScanDevicesActivity,
-                    "Permissão concedida com sucesso", Toast.LENGTH_SHORT).show()
-            } else {
-                rootManager.setRootDenied(true)
-                showRootDeniedMessage()
-            }
-        } catch (e: Exception) {
-
-        } finally {
-            binding.progressBarCircular.visibility = View.GONE
-        }
-    }
-
-    private fun showRootDeniedMessage() {
-        AlertDialog.Builder(this)
-            .setTitle("Funcionalidade Limitada")
-            .setMessage("Sem permissão root, alguns recursos como obtenção de MAC addresses serão limitados.")
-            .setPositiveButton("OK", null)
-            .show()
-    }
-
-    private fun showDeviceNotRootedWarning() {
-        AlertDialog.Builder(this)
-            .setTitle("Dispositivo não rootado")
-            .setMessage("Para obter endereços MAC completos, o dispositivo precisa ter acesso root.")
-            .setPositiveButton("OK", null)
-            .show()
-    }
-
-    private fun startScanningDevices() {
+    private fun initializeClickEvents() {
         binding.btnStartScan.setOnClickListener {
-
-            //checkRootStatus()
 
             binding.btnStartScan.isEnabled = false
             binding.progressBarCircular.visibility = View.VISIBLE
             binding.rvListScanDevices.visibility = View.GONE
 
-            CoroutineScope(Dispatchers.Main).launch {
-                try {
-                    val discoveredDevices = withContext(Dispatchers.IO) {
-                        //networkScanner.getConnectedHotspotDevices(hasRootAccess = rootAccessGranted)
-                        networkScanner.getConnectedHotspotDevices()
-                    }
-
-                    scannedDevices.clear()
-                    scannedDevices.addAll(discoveredDevices)
-
-                    if (scannedDevices.isEmpty()) {
-                        Toast.makeText(
-                            this@ScanDevicesActivity,
-                            "Nenhum dispositivo encontrado na rede",
-                            Toast.LENGTH_SHORT
-                        ).show()
-                    }
-
-                    loadDevicesWithSavedData()
-                } catch (e: Exception) {
-                    Toast.makeText(
-                        this@ScanDevicesActivity,
-                        "Erro no scan: ${e.message}",
-                        Toast.LENGTH_SHORT
-                    ).show()
-                    Log.e("NetworkScan", "Erro ao escanear rede", e)
-                } finally {
-                    binding.rvListScanDevices.visibility = View.VISIBLE
+            RootUtils.checkRootAccess(this) { hasRoot ->
+                if (hasRoot) {
+                    startScanningDevices()
+                } else {
                     binding.btnStartScan.isEnabled = true
                     binding.progressBarCircular.visibility = View.GONE
+                    binding.rvListScanDevices.visibility = View.GONE
                 }
+            }
+        }
+    }
+
+    private fun startScanningDevices() {
+        CoroutineScope(Dispatchers.Main).launch {
+            try {
+                val discoveredDevices = withContext(Dispatchers.IO) {
+                    networkScanner.getConnectedHotspotDevices()
+                }
+
+                scannedDevices.clear()
+                scannedDevices.addAll(discoveredDevices)
+
+                if (scannedDevices.isEmpty()) {
+                    Toast.makeText(
+                        this@ScanDevicesActivity,
+                        "Nenhum dispositivo encontrado na rede",
+                        Toast.LENGTH_SHORT
+                    ).show()
+                }
+
+                loadDevicesWithSavedData()
+            } catch (e: Exception) {
+                Toast.makeText(
+                    this@ScanDevicesActivity,
+                    "Erro no scan: ${e.message}",
+                    Toast.LENGTH_SHORT
+                ).show()
+                Log.e("NetworkScan", "Erro ao escanear rede", e)
+            } finally {
+                binding.rvListScanDevices.visibility = View.VISIBLE
+                binding.btnStartScan.isEnabled = true
+                binding.progressBarCircular.visibility = View.GONE
             }
         }
     }
@@ -474,12 +386,8 @@ class ScanDevicesActivity : AppCompatActivity() {
             val activities = packageManager.queryIntentActivities(cameraIntent, PackageManager.MATCH_ALL)
 
             if (activities.isNotEmpty()) {
-                // Se houver apps, tente abrir a câmera
                 openCameraLauncher.launch(cameraIntent)
             } else {
-                // Se não houver, mostre uma lista dos pacotes (para debug)
-                val packagesList = activities.joinToString { it.activityInfo.packageName }
-                Log.d("CameraDebug", "Available camera apps: $packagesList")
                 Toast.makeText(this, "No camera app available", Toast.LENGTH_LONG).show()
             }
         }

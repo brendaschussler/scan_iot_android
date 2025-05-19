@@ -2,6 +2,8 @@ package com.example.scaniot.model
 
 import android.content.Context
 import android.content.Intent
+import android.net.Uri
+import android.os.Build
 import android.os.Bundle
 import android.util.Log
 import android.widget.Button
@@ -10,7 +12,13 @@ import android.widget.ProgressBar
 import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.content.FileProvider
+import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.firestore.FieldValue
+import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.storage.FirebaseStorage
 import java.io.DataOutputStream
+import java.io.File
 import java.net.InetAddress
 import java.net.NetworkInterface
 import java.text.SimpleDateFormat
@@ -94,6 +102,9 @@ class PacketCapturer(private val context: Context) {
                                                 CaptureRepository.updateDeviceCaptureProgress(sessionId, mac, packetCount, packetCount, System.currentTimeMillis(), outputFile)
                                                 CaptureRepository.updateDeviceCaptureState(sessionId, mac, false)
                                                 sendDeviceProgressUpdate(sessionId, mac, captured, packetCount, System.currentTimeMillis(), outputFile)
+                                                uploadPcapToFirebase(outputFileName, outputFile, sessionId, mac) { success, message ->
+                                                    Log.d("UPLOAD", "Upload $success: $message")
+                                                }
                                             }
                                         }
                                     }
@@ -172,6 +183,9 @@ class PacketCapturer(private val context: Context) {
                                 CaptureRepository.updateDeviceCaptureProgress(sessionId, mac, elapsedTime.toInt(), elapsedTime.toInt(), System.currentTimeMillis(), outputFile)
                                 CaptureRepository.updateDeviceCaptureState(sessionId, mac, false)
                                 sendDeviceProgressUpdate(sessionId, mac, elapsedTime.toInt(), elapsedTime.toInt(), System.currentTimeMillis(), outputFile)
+                                uploadPcapToFirebase(outputFileName, outputFile, sessionId, mac) { success, message ->
+                                    Log.d("UPLOAD", "Upload $success: $message")
+                                }
                             }
                         }
 
@@ -256,4 +270,127 @@ class PacketCapturer(private val context: Context) {
         }
 
     }
+
+    private fun uploadPcapToFirebase(filePath: String, outputFile: String, sessionId: String, mac: String, callback: (Boolean, String) -> Unit) {
+        try {
+            val file = File(filePath)
+            if (!file.exists() || file.length() == 0L) {
+                callback(false, "Arquivo inválido ou vazio")
+                return
+            }
+
+            // 1. Obter URI segura usando FileProvider
+            val uri = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                FileProvider.getUriForFile(
+                    context,
+                    "${context.packageName}.provider", // Deve corresponder ao authority no manifesto
+                    file
+                )
+            } else {
+                Uri.fromFile(file) // Para versões anteriores ao Android 7
+            }
+
+            // 2. Conceder permissão temporária
+            context.grantUriPermission(
+                "com.google.firebase.storage", // Pacote do Firebase Storage
+                uri,
+                Intent.FLAG_GRANT_READ_URI_PERMISSION
+            )
+
+            val userId = FirebaseAuth.getInstance().currentUser?.uid ?: run {
+                callback(false, "Usuário não autenticado")
+                return
+            }
+
+            val storageRef = FirebaseStorage.getInstance().reference
+                .child("users/$userId/captures/$sessionId/${mac}_${sessionId}.pcap")
+
+            val uploadTask = storageRef.putFile(uri)
+                .addOnProgressListener { snapshot ->
+                    val progress = (100.0 * snapshot.bytesTransferred / snapshot.totalByteCount)
+                    Log.d("UPLOAD", "Progresso: $progress%")
+                }
+
+            uploadTask.continueWithTask { task ->
+                if (!task.isSuccessful) {
+                    task.exception?.let { throw it }
+                }
+                storageRef.downloadUrl
+            }.addOnCompleteListener { task ->
+                // 3. Revogar permissão após o upload
+                context.revokeUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
+
+                if (task.isSuccessful) {
+                    val downloadUrl = task.result.toString()
+                    updateFirestoreWithDownloadUrl(sessionId, mac, downloadUrl)
+                    callback(true, "Upload concluído com sucesso")
+                    // Opcional: deletar o arquivo local após upload
+                    file.delete()
+                } else {
+                    val error = task.exception ?: Exception("Erro desconhecido")
+                    Log.e("UPLOAD", "Erro no upload", error)
+                    callback(false, "Erro no upload: ${error.localizedMessage}")
+                }
+            }
+
+        } catch (e: Exception) {
+            Log.e("UPLOAD", "Erro geral", e)
+            callback(false, "Erro: ${e.localizedMessage}")
+        }
+    }
+
+    /*private fun uploadPcapToFirebase(filePath: String, outputFile: String, sessionId: String, mac: String, callback: (Boolean, String) -> Unit) {
+        val storage = FirebaseStorage.getInstance()
+        val userId = FirebaseAuth.getInstance().currentUser?.uid ?: run {
+            callback(false, "Usuário não autenticado")
+            return
+        }
+
+        val file = File(filePath)
+        if (!file.exists()) {
+            callback(false, "Arquivo não encontrado")
+            Log.d("UPLOAD", "Arquivo nao encontrado")
+            return
+        }
+
+        // Cria uma estrutura de pastas: users/{userId}/captures/{sessionId}/{mac}.pcap
+        val storageRef = storage.reference
+            .child("users")
+            .child(userId)
+            .child("captures")
+            .child(sessionId)
+            .child("${outputFile}_${mac}_${sessionId}.pcap")
+
+        val uploadTask = storageRef.putFile(Uri.fromFile(file))
+
+        uploadTask.addOnSuccessListener {
+            // Atualiza o Firestore com a URL do arquivo
+            storageRef.downloadUrl.addOnSuccessListener { uri ->
+                updateFirestoreWithDownloadUrl(sessionId, mac, uri.toString())
+                callback(true, "Upload concluído com sucesso")
+                Log.d("UPLOAD", "Upload concluído com sucesso")
+            }.addOnFailureListener { e ->
+                callback(false, "Erro ao obter URL: ${e.message}")
+                Log.d("UPLOAD", "Erro ao obter URL: ${e.message}")
+            }
+        }.addOnFailureListener { e ->
+            callback(false, "Erro no upload: ${e.message}")
+            Log.d("UPLOAD", "Erro no upload: ${e.message}")
+        }
+    }*/
+
+    private fun updateFirestoreWithDownloadUrl(sessionId: String, mac: String, downloadUrl: String) {
+        val userId = FirebaseAuth.getInstance().currentUser?.uid ?: return
+
+        FirebaseFirestore.getInstance()
+            .collection("captured_list")
+            .document(userId)
+            .collection("captures")
+            .document(sessionId)
+            .update(
+                "devices.$mac.downloadUrl", downloadUrl,
+                "lastUpdated", FieldValue.serverTimestamp()
+            )
+    }
+
 }
