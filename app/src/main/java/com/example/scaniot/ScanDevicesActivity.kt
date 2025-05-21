@@ -75,6 +75,8 @@ class ScanDevicesActivity : AppCompatActivity() {
     private val valPermissions = listOf(
         android.Manifest.permission.CAMERA,
         android.Manifest.permission.READ_EXTERNAL_STORAGE,
+        android.Manifest.permission.WRITE_EXTERNAL_STORAGE,
+        android.Manifest.permission.MANAGE_EXTERNAL_STORAGE,
         android.Manifest.permission.READ_MEDIA_IMAGES,
         android.Manifest.permission.ACCESS_WIFI_STATE,
         android.Manifest.permission.ACCESS_NETWORK_STATE,

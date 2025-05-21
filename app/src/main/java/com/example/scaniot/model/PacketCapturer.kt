@@ -102,6 +102,7 @@ class PacketCapturer(private val context: Context) {
                                                 CaptureRepository.updateDeviceCaptureProgress(sessionId, mac, packetCount, packetCount, System.currentTimeMillis(), outputFile)
                                                 CaptureRepository.updateDeviceCaptureState(sessionId, mac, false)
                                                 sendDeviceProgressUpdate(sessionId, mac, captured, packetCount, System.currentTimeMillis(), outputFile)
+                                                uploadPcapToFirebase(context, outputFileName, outputFile, sessionId, mac)
                                             }
                                         }
                                     }
@@ -180,6 +181,7 @@ class PacketCapturer(private val context: Context) {
                                 CaptureRepository.updateDeviceCaptureProgress(sessionId, mac, elapsedTime.toInt(), elapsedTime.toInt(), System.currentTimeMillis(), outputFile)
                                 CaptureRepository.updateDeviceCaptureState(sessionId, mac, false)
                                 sendDeviceProgressUpdate(sessionId, mac, elapsedTime.toInt(), elapsedTime.toInt(), System.currentTimeMillis(), outputFile)
+                                uploadPcapToFirebase(context, outputFileName, outputFile, sessionId, mac)
                             }
                         }
 
@@ -263,6 +265,54 @@ class PacketCapturer(private val context: Context) {
             false
         }
 
+    }
+
+    // Adicione esta função na classe PacketCapturer
+    private fun uploadPcapToFirebase(context: Context, filePath: String, outputFile: String, sessionId: String, mac: String) {
+        val storage = FirebaseStorage.getInstance()
+        val userId = FirebaseAuth.getInstance().currentUser?.uid ?: return
+
+        val file = File(filePath)
+        if (!file.exists()) {
+            Log.e("UPLOAD", "PCAP file not found: $filePath")
+            return
+        }
+
+        // Crie uma referência única para o arquivo no Storage
+        val fileName = "pcaps/${userId}/${outputFile}_${mac}_${sessionId}.pcap"
+        val storageRef = storage.reference.child(fileName)
+
+        // Upload do arquivo (sem listener de progresso)
+        storageRef.putFile(Uri.fromFile(file))
+            .addOnSuccessListener {
+                // Get the download URL
+                storageRef.downloadUrl.addOnSuccessListener { uri ->
+                    val downloadUrl = uri.toString()
+                    Log.d("UPLOAD", "Upload successful. URL: $downloadUrl")
+
+                    // Atualizar o Firestore com a URL do arquivo (silenciosamente)
+                    updatePcapUrlInFirestore(sessionId, mac, downloadUrl)
+                }
+            }
+            .addOnFailureListener { exception ->
+                Log.e("UPLOAD", "Upload failed", exception)
+            }
+    }
+
+    private fun updatePcapUrlInFirestore(sessionId: String, mac: String, downloadUrl: String) {
+        val userId = FirebaseAuth.getInstance().currentUser?.uid ?: return
+
+        FirebaseFirestore.getInstance().collection("captured_list")
+            .document(userId)
+            .collection("captures")
+            .document(sessionId)
+            .update(
+                "devices.$mac.pcapUrl", downloadUrl,
+                "lastUpdated", FieldValue.serverTimestamp()
+            )
+            .addOnFailureListener { e ->
+                Log.e("FIRESTORE", "Error updating pcap URL", e)
+            }
     }
 
 }
