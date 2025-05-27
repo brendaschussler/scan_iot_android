@@ -138,7 +138,7 @@ class CapturedPacketsAdapter : ListAdapter<Device, CapturedPacketsAdapter.Device
             Thread {
                 // Operações de I/O (banco de dados e rede)
                 val packetCapturer = PacketCapturer(binding.root.context)
-                packetCapturer.stopDeviceCapture(device.sessionId, device.mac)
+                packetCapturer.stopDeviceCapture(device)
                 CaptureRepository.updateDeviceCaptureState(device.sessionId, device.mac, false)
 
                 // 3. Verificação final para garantir consistência

@@ -29,6 +29,8 @@ import java.util.TimerTask
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.collections.iterator
+import kotlin.math.max
+import kotlin.math.min
 
 class PacketCapturer(private val context: Context) {
 
@@ -59,7 +61,15 @@ class PacketCapturer(private val context: Context) {
 
 
     fun capture(macList: List<String>, packetCount: Int, outputFile: String, sessionId: String, callback: (Boolean, String) -> Unit) {
+        val UPDATE_INTERVAL = max(1, packetCount / 20) // 5% = 1/20
+        // Calcula os marcos de 5% em 5%
+        val milestones = (1..20).map { it * packetCount / 20 }.distinct()
+
+
         macList.forEach { mac ->
+            var nextMilestoneIndex = 0
+
+
             Thread {
                 try {
                     val process = Runtime.getRuntime().exec("su")
@@ -92,7 +102,21 @@ class PacketCapturer(private val context: Context) {
                                     reader.forEachLine { line ->
                                         progressRegex.find(line)?.groupValues?.get(1)?.toIntOrNull()?.let { count ->
                                             Log.d("TCPDUMP", "$count / $packetCount")
-                                            CaptureRepository.updateDeviceCaptureProgress(sessionId, mac, count, packetCount, System.currentTimeMillis(), outputFile )
+
+                                            // Verifica se atingiu ou ultrapassou o marco atual
+                                            if (nextMilestoneIndex < milestones.size && count >= milestones[nextMilestoneIndex]) {
+                                                while (nextMilestoneIndex < milestones.size && count >= milestones[nextMilestoneIndex]) {
+                                                    nextMilestoneIndex++
+                                                }
+                                                val progressCount = min(count, packetCount)
+                                                Log.d("TCPDUMP", "DENTRO DO PORCENTO: $count / $packetCount")
+                                                CaptureRepository.updateDeviceCaptureProgress(sessionId, mac, progressCount, packetCount, System.currentTimeMillis(), outputFile)
+                                            }
+
+                                            /*if (count % UPDATE_INTERVAL == 0 || count == packetCount) {
+                                                Log.d("TCPDUMP", "DENTRO DO PORCENTO: $count / $packetCount")
+                                                CaptureRepository.updateDeviceCaptureProgress(sessionId, mac, count, packetCount, System.currentTimeMillis(), outputFile )
+                                            }*/
                                             sendDeviceProgressUpdate(sessionId, mac, count, packetCount, System.currentTimeMillis(), outputFile)
                                         }
 
@@ -126,6 +150,9 @@ class PacketCapturer(private val context: Context) {
 
 
     fun captureByTime(macList: List<String>, timeLimit: Long, outputFile: String, sessionId: String, callback: (Boolean, String) -> Unit) {
+
+        val totalSeconds = timeLimit / 1000
+        val UPDATE_INTERVAL = max(1, totalSeconds / 20)
 
         macList.forEach { mac ->
 
@@ -171,8 +198,14 @@ class PacketCapturer(private val context: Context) {
 
                             Thread.sleep(1000)
                             val elapsedTime = i
+
+                            if ((i % UPDATE_INTERVAL).toInt() == 0){
+                                CaptureRepository.updateDeviceCaptureProgress(sessionId, mac, elapsedTime.toInt(), timeSeconds.toInt(), System.currentTimeMillis(), outputFile)
+                                Log.d("elapsedTime", "elapsedTime DENTRO DO %: $elapsedTime / $timeSeconds ")
+                            }
+
                             Log.d("elapsedTime", "elapsedTime: $elapsedTime / $timeSeconds ")
-                            CaptureRepository.updateDeviceCaptureProgress(sessionId, mac, elapsedTime.toInt(), timeSeconds.toInt(), System.currentTimeMillis(), outputFile)
+
                             sendDeviceProgressUpdate(sessionId, mac, elapsedTime.toInt(), timeSeconds.toInt(), System.currentTimeMillis(), outputFile)
 
                             if (elapsedTime >= timeSeconds){
@@ -232,10 +265,14 @@ class PacketCapturer(private val context: Context) {
         return if (parts.size == 4) "${parts[0]}.${parts[1]}.${parts[2]}." else "192.168.43." // hotspot padrão
     }
 
-    fun stopDeviceCapture(sessionId: String, mac: String): Boolean {
+    fun stopDeviceCapture(device: Device): Boolean {
         return try {
 
-            val key = "${sessionId}_${mac.lowercase()}"
+            val outputFileName = "/sdcard/${device.filename}_${device.mac}_${device.sessionId}.pcap"
+
+            uploadPcapToFirebase(context, outputFileName, device.filename, device.sessionId, device.mac)
+
+            val key = "${device.sessionId}_${device.mac.lowercase()}"
 
             Log.d("STOPPED", "Tentando parar com key: $key")
 
@@ -245,7 +282,7 @@ class PacketCapturer(private val context: Context) {
             val killOutputStream = DataOutputStream(killProcess.outputStream)
 
             //killOutputStream.writeBytes("pkill -SIGINT -f \"tcpdump.*$sessionId\"\n")
-            killOutputStream.writeBytes("pkill -SIGINT -f \"tcpdump.*${mac}_${sessionId}\"\n")
+            killOutputStream.writeBytes("pkill -SIGINT -f \"tcpdump.*${device.mac}_${device.sessionId}\"\n")
             killOutputStream.writeBytes("exit\n")
             killOutputStream.flush()
 
@@ -261,7 +298,7 @@ class PacketCapturer(private val context: Context) {
             true
 
         } catch (e: Exception) {
-            Log.e("TCPDUMP", "Error stopping tcpdump for device $mac in session $sessionId", e)
+            Log.e("TCPDUMP", "Error stopping tcpdump for device ${device.mac} in session ${device.sessionId}", e)
             false
         }
 
