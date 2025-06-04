@@ -93,7 +93,7 @@ class DashboardScreenActivity : AppCompatActivity() {
         val toolbar = binding.includeToolbarMain.tbMain
         setSupportActionBar( toolbar )
         supportActionBar?.apply {
-            title = "ScanIoT"
+            title = "Droid Scour"
         }
 
         binding.btnLogout.setOnClickListener {
