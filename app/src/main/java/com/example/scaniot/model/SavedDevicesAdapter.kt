@@ -20,7 +20,7 @@ class SavedDevicesAdapter(
     }
 
     fun submitList(newList: List<Device>) {
-        devicesList = newList
+        devicesList = newList.sortedBy { it.name?.lowercase() }
         //selectedDevices.clear() // Limpa seleções ao atualizar a lista
         notifyDataSetChanged()
     }

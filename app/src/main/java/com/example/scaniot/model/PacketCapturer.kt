@@ -316,7 +316,7 @@ class PacketCapturer(private val context: Context) {
         }
 
         // Crie uma referência única para o arquivo no Storage
-        val fileName = "pcaps/${userId}/${outputFile}_${mac}_${sessionId}.pcap"
+        val fileName = "pcaps/${userId}/${mac}/${outputFile}_${mac}_${sessionId}.pcap"
         val storageRef = storage.reference.child(fileName)
 
         // Upload do arquivo (sem listener de progresso)

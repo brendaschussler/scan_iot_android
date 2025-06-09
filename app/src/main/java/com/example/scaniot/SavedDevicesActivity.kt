@@ -355,7 +355,8 @@ class SavedDevicesActivity : AppCompatActivity() {
             .addOnSuccessListener { documents ->
                 val devicesList = documents.map { doc ->
                     doc.toObject(Device::class.java).copy(mac = doc.id) // Usa o MAC como ID
-                }
+                }.sortedBy { it.name?.lowercase() }
+
                 savedDevicesAdapter.submitList(devicesList)
             }
             .addOnFailureListener { e ->
