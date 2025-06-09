@@ -27,15 +27,14 @@ import com.example.scaniot.model.CaptureRepository
 import com.example.scaniot.model.Device
 import com.example.scaniot.model.SavedDevicesAdapter
 import com.example.scaniot.utils.showMessage
-import com.example.scaniot.LoginActivity
 import com.google.android.material.textfield.TextInputEditText
 import com.google.android.material.textfield.TextInputLayout
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.storage.FirebaseStorage
-import com.example.scaniot.model.PacketCapturer
 import com.example.scaniot.utils.RootUtils
 import com.example.scaniot.utils.TcpdumpUtils
+import android.widget.SearchView
 
 class SavedDevicesActivity : AppCompatActivity() {
 
@@ -61,6 +60,8 @@ class SavedDevicesActivity : AppCompatActivity() {
         FirebaseFirestore.getInstance()
     }
 
+    private var allDevices = emptyList<Device>()
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
@@ -72,6 +73,7 @@ class SavedDevicesActivity : AppCompatActivity() {
         setupRecyclerView()
         loadSavedDevices()
         initializeClickEvents()
+        setupSearchView()
 
         if (!hasStoragePermissions()) {
             requestStoragePermissions()
@@ -83,6 +85,33 @@ class SavedDevicesActivity : AppCompatActivity() {
             insets
 
         }
+    }
+
+    private fun setupSearchView() {
+        binding.searchView.setOnQueryTextListener(object : SearchView.OnQueryTextListener {
+            override fun onQueryTextSubmit(query: String?): Boolean {
+                return false
+            }
+
+            override fun onQueryTextChange(newText: String?): Boolean {
+                filterDevices(newText.orEmpty())
+                return true
+            }
+        })
+    }
+
+    private fun filterDevices(query: String) {
+        val filteredList = if (query.isEmpty()) {
+            allDevices
+        } else {
+            allDevices.filter { device ->
+                device.name?.contains(query, ignoreCase = true) == true ||
+                        device.mac?.contains(query, ignoreCase = true) == true ||
+                        device.ip?.contains(query, ignoreCase = true) == true ||
+                        device.vendor?.contains(query, ignoreCase = true) == true
+            }
+        }
+        savedDevicesAdapter.submitList(filteredList)
     }
 
     private fun hasStoragePermissions(): Boolean {
@@ -126,23 +155,23 @@ class SavedDevicesActivity : AppCompatActivity() {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
         if (requestCode == PERMISSIONS_REQUEST_CODE) {
             if (grantResults.all { it == PackageManager.PERMISSION_GRANTED }) {
-                Log.d("Permissions", "Permissões concedidas!")
+                Log.d("Permissions", "Permissions Granted")
             } else {
                 Toast.makeText(
                     this,
-                    "Permissões são necessárias para salvar os arquivos de captura.",
+                    "Permissions are required to save the capture files.",
                     Toast.LENGTH_SHORT
                 ).show()
             }
         }
     }
 
-    // Para Android 11+ (API 30+)
+    // Android 11+ (API 30+)
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
         if (requestCode == PERMISSIONS_REQUEST_CODE && Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
             if (Environment.isExternalStorageManager()) {
-                Log.d("Permissions", "Acesso total concedido!")
+                Log.d("Permissions", "Full access granted")
             }
         }
     }
@@ -151,7 +180,6 @@ class SavedDevicesActivity : AppCompatActivity() {
         binding.btnStartCapture.setOnClickListener {
             val selectedDevices = savedDevicesAdapter.getSelectedDevices()
 
-            // DEBUG: Verifique no Logcat se está capturando corretamente
             println("Dispositivos selecionados: ${selectedDevices}")
             selectedDevices.forEach { println("- ${it.name} (${it.mac})") }
 
@@ -171,12 +199,10 @@ class SavedDevicesActivity : AppCompatActivity() {
         val editFilename = dialogView.findViewById<TextInputEditText>(R.id.editFilename)
         val timeInputLayout = dialogView.findViewById<LinearLayout>(R.id.timeInputLayout)
 
-        // Campos de tempo
         val editHours = dialogView.findViewById<TextInputEditText>(R.id.editHours)
         val editMinutes = dialogView.findViewById<TextInputEditText>(R.id.editMinutes)
         val editSeconds = dialogView.findViewById<TextInputEditText>(R.id.editSeconds)
 
-        // Configura o listener para mudar o modo
         radioCaptureMode.setOnCheckedChangeListener { _, checkedId ->
             when (checkedId) {
                 R.id.radioPacketCount -> {
@@ -206,31 +232,35 @@ class SavedDevicesActivity : AppCompatActivity() {
                         showMessage("Please set a number of packages greater than zero")
                         return@setPositiveButton
                     }
+
+                    if (packetCount > 300_000) {
+                        showMessage("Maximum number of packages exceeded (300k)")
+                        return@setPositiveButton
+                    }
+
                     checkRootAndStartCapture(selectedDevices, packetCount, 0, filename)
-                    //startCapturedPacketsActivity(selectedDevices, packetCount, 0, filename)
+
                 } else {
-                    // Obter valores de horas, minutos e segundos (considerar 0 se vazio)
+
                     val hours = editHours.text.toString().toIntOrNull() ?: 0
                     val minutes = editMinutes.text.toString().toIntOrNull() ?: 0
                     val seconds = editSeconds.text.toString().toIntOrNull() ?: 0
 
-                    // Validar pelo menos algum tempo foi definido
+
                     if (hours == 0 && minutes == 0 && seconds == 0) {
                         showMessage("Please set at least some time for capture")
                         return@setPositiveButton
                     }
 
                     val totalSeconds = (hours * 3600) + (minutes * 60) + seconds
-                    if (totalSeconds > 2_147_483) {
-                        Toast.makeText(this, "Total time exceeds maximum limit (596 hours)", Toast.LENGTH_SHORT).show()
+                    if (totalSeconds > 43_200) {
+                        Toast.makeText(this, "Total time exceeds maximum limit (12 hours)", Toast.LENGTH_SHORT).show()
                         return@setPositiveButton
                     }
 
-                    // Converter para milissegundos
                     val milliseconds = totalSeconds * 1000L
 
                     checkRootAndStartCaptureByTime(selectedDevices, 0, milliseconds, filename)
-                    //startCapturedPacketsActivity(selectedDevices, 0, milliseconds, filename)
                 }
             }
             .setNegativeButton("Cancel", null)
@@ -284,7 +314,7 @@ class SavedDevicesActivity : AppCompatActivity() {
     private fun showTimeoutMessage() {
         AlertDialog.Builder(this)
             .setTitle("Timeout is not installed\n")
-            .setMessage("timeout is required for packet capture by time limit. Please install it by following the tutorial at link")
+            .setMessage("Timeout is required for packet capture by time limit. Please install it by following the tutorial in help icon")
             .setPositiveButton("Ok") { _, _ ->
             }
             .show()
@@ -293,7 +323,7 @@ class SavedDevicesActivity : AppCompatActivity() {
     private fun showTcpdumpMessage() {
         AlertDialog.Builder(this)
             .setTitle("Tcpdump is not installed\n")
-            .setMessage("tcpdump is required for packet capture by time limit. Please install it by following the tutorial at link")
+            .setMessage("Tcpdump is required for packet capture by time limit. Please install it by following the tutorial in help icon")
             .setPositiveButton("Ok") { _, _ ->
             }
             .show()
@@ -303,7 +333,7 @@ class SavedDevicesActivity : AppCompatActivity() {
         val devicesWithCapture = devices.map {
             it.copy(
                 capturing = true,
-                captureTotal = if (timeLimitMs > 0) 0 else packetCount.coerceAtLeast(1), // Garante pelo menos 1 pacote
+                captureTotal = if (timeLimitMs > 0) 0 else packetCount.coerceAtLeast(1),
                 timeLimitMs = timeLimitMs,
                 captureProgress = 0,
                 lastCaptureTimestamp = System.currentTimeMillis()
@@ -331,8 +361,7 @@ class SavedDevicesActivity : AppCompatActivity() {
                 deleteDevice(device)
             },
             onCheckboxChange = { device, isChecked ->
-                // Implemente a lógica de seleção aqui
-                //updateSelectedDevices(device, isChecked)
+
             }
         )
 
@@ -353,11 +382,11 @@ class SavedDevicesActivity : AppCompatActivity() {
             .collection("devices")
             .get()
             .addOnSuccessListener { documents ->
-                val devicesList = documents.map { doc ->
-                    doc.toObject(Device::class.java).copy(mac = doc.id) // Usa o MAC como ID
+                allDevices = documents.map { doc ->
+                    doc.toObject(Device::class.java).copy(mac = doc.id)
                 }.sortedBy { it.name?.lowercase() }
 
-                savedDevicesAdapter.submitList(devicesList)
+                savedDevicesAdapter.submitList(allDevices)
             }
             .addOnFailureListener { e ->
                 showMessage("Error loading devices: ${e.message}")
@@ -374,10 +403,10 @@ class SavedDevicesActivity : AppCompatActivity() {
                 firestore.collection("saved_devices")
                     .document(currentUser.uid)
                     .collection("devices")
-                    .document(device.mac) // Usa o MAC como ID do documento
+                    .document(device.mac)
                     .delete()
                     .addOnSuccessListener {
-                        loadSavedDevices() // Recarrega a lista
+                        loadSavedDevices()
                         showMessage("Device deleted")
                     }
             }

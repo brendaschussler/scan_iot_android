@@ -10,15 +10,12 @@ import java.io.InputStreamReader
 
 object RootUtils {
 
-    /**
-     * Verifica o acesso root e chama o callback no UI Thread
-     */
     fun checkRootAccess(context: Context, callback: (Boolean) -> Unit) {
         Thread {
             val isRootAvailable = isRootAvailable()
             if (!isRootAvailable) {
                 Handler(Looper.getMainLooper()).post {
-                    Toast.makeText(context, "Root não disponível neste dispositivo", Toast.LENGTH_LONG).show()
+                    Toast.makeText(context, "Root not available on this device", Toast.LENGTH_LONG).show()
                     callback(false)
                 }
                 return@Thread
@@ -27,7 +24,7 @@ object RootUtils {
             val isRootGranted = isRootGranted()
             if (!isRootGranted) {
                 Handler(Looper.getMainLooper()).post {
-                    Toast.makeText(context, "Permissão root não concedida", Toast.LENGTH_LONG).show()
+                    Toast.makeText(context, "Root permission not granted", Toast.LENGTH_LONG).show()
                     callback(false)
                 }
                 return@Thread

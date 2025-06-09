@@ -3,16 +3,9 @@ package com.example.scaniot.model
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
-import android.os.Build
-import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.util.Log
-import android.widget.Button
-import android.widget.EditText
-import android.widget.ProgressBar
-import android.widget.TextView
-import android.widget.Toast
-import androidx.appcompat.app.AppCompatActivity
-import androidx.core.content.FileProvider
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
@@ -21,16 +14,11 @@ import java.io.DataOutputStream
 import java.io.File
 import java.net.InetAddress
 import java.net.NetworkInterface
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
-import java.util.Timer
-import java.util.TimerTask
 import java.util.concurrent.ConcurrentHashMap
-import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.collections.iterator
 import kotlin.math.max
 import kotlin.math.min
+import kotlin.math.pow
 
 class PacketCapturer(private val context: Context) {
 
@@ -47,7 +35,6 @@ class PacketCapturer(private val context: Context) {
 
 
     private fun sendDeviceProgressUpdate(sessionId: String, mac: String, progress: Int, total: Int, end: Long, filename: String) {
-        val dateFormat = SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.getDefault())
         val intent = Intent(PROGRESS_UPDATE_ACTION).apply {
             putExtra(EXTRA_SESSION_ID, sessionId) // Combine sessionId and mac
             putExtra(EXTRA_PROGRESS, progress)
@@ -61,14 +48,12 @@ class PacketCapturer(private val context: Context) {
 
 
     fun capture(macList: List<String>, packetCount: Int, outputFile: String, sessionId: String, callback: (Boolean, String) -> Unit) {
-        val UPDATE_INTERVAL = max(1, packetCount / 20) // 5% = 1/20
-        // Calcula os marcos de 5% em 5%
+
         val milestones = (1..20).map { it * packetCount / 20 }.distinct()
 
 
         macList.forEach { mac ->
             var nextMilestoneIndex = 0
-
 
             Thread {
                 try {
@@ -86,7 +71,7 @@ class PacketCapturer(private val context: Context) {
 
                         val outputFileName = "/sdcard/${outputFile}_${mac}_${sessionId}.pcap"
                         val command = "tcpdump -i $interfaceName ether host $mac -s 0 -c $packetCount -v -w $outputFileName\n"
-                        Log.d("TCPDUMP", "Executando: $command")
+                        Log.d("TCPDUMP", "Running: $command")
 
                         outputStream.writeBytes(command)
                         outputStream.writeBytes("exit\n")
@@ -103,20 +88,14 @@ class PacketCapturer(private val context: Context) {
                                         progressRegex.find(line)?.groupValues?.get(1)?.toIntOrNull()?.let { count ->
                                             Log.d("TCPDUMP", "$count / $packetCount")
 
-                                            // Verifica se atingiu ou ultrapassou o marco atual
                                             if (nextMilestoneIndex < milestones.size && count >= milestones[nextMilestoneIndex]) {
                                                 while (nextMilestoneIndex < milestones.size && count >= milestones[nextMilestoneIndex]) {
                                                     nextMilestoneIndex++
                                                 }
                                                 val progressCount = min(count, packetCount)
-                                                Log.d("TCPDUMP", "DENTRO DO PORCENTO: $count / $packetCount")
                                                 CaptureRepository.updateDeviceCaptureProgress(sessionId, mac, progressCount, packetCount, System.currentTimeMillis(), outputFile)
                                             }
 
-                                            /*if (count % UPDATE_INTERVAL == 0 || count == packetCount) {
-                                                Log.d("TCPDUMP", "DENTRO DO PORCENTO: $count / $packetCount")
-                                                CaptureRepository.updateDeviceCaptureProgress(sessionId, mac, count, packetCount, System.currentTimeMillis(), outputFile )
-                                            }*/
                                             sendDeviceProgressUpdate(sessionId, mac, count, packetCount, System.currentTimeMillis(), outputFile)
                                         }
 
@@ -146,8 +125,6 @@ class PacketCapturer(private val context: Context) {
         callback(true, "Capture started for all devices")
     }
 
-    //val timeCaptureThreads: ConcurrentHashMap<String, Thread> = ConcurrentHashMap()
-
 
     fun captureByTime(macList: List<String>, timeLimit: Long, outputFile: String, sessionId: String, callback: (Boolean, String) -> Unit) {
 
@@ -158,15 +135,12 @@ class PacketCapturer(private val context: Context) {
 
             val key = "${sessionId}_${mac.lowercase()}"
 
-            Log.d("CAPTURE", "Salvando thread com key: $key")
-
             val captureThread = Thread {
 
                 try {
                     val process = Runtime.getRuntime().exec("su")
                     val outputStream = DataOutputStream(process.outputStream)
 
-                    val filter = macList.joinToString(" or ") { "ether host $it" }
                     val localIp = getActiveIpAddress()
                     Log.d("TCPDUMP", "LocalIp: $localIp")
 
@@ -185,14 +159,11 @@ class PacketCapturer(private val context: Context) {
 
                         val command = "timeout ${timeSeconds}s tcpdump -i $interfaceName ether host $mac -s 0 -v -w $outputFileName\n"
 
-                        Log.d("TCPDUMP", "Executando: $command")
+                        Log.d("TCPDUMP", "Running: $command")
 
                         outputStream.writeBytes(command)
                         outputStream.writeBytes("exit\n")
                         outputStream.flush()
-
-                        //timeCaptureRunning["${sessionId}_$mac"] = AtomicBoolean(true)
-
 
                         for (i in 1..timeSeconds) {
 
@@ -201,7 +172,6 @@ class PacketCapturer(private val context: Context) {
 
                             if ((i % UPDATE_INTERVAL).toInt() == 0){
                                 CaptureRepository.updateDeviceCaptureProgress(sessionId, mac, elapsedTime.toInt(), timeSeconds.toInt(), System.currentTimeMillis(), outputFile)
-                                Log.d("elapsedTime", "elapsedTime DENTRO DO %: $elapsedTime / $timeSeconds ")
                             }
 
                             Log.d("elapsedTime", "elapsedTime: $elapsedTime / $timeSeconds ")
@@ -210,7 +180,6 @@ class PacketCapturer(private val context: Context) {
 
                             if (elapsedTime >= timeSeconds){
                                 CaptureRepository.updateCaptureState(sessionId, false)
-                                Log.d("elapsedTime", "FINALIZOU: elapsedTime: $i / $timeSeconds ")
                                 CaptureRepository.updateDeviceCaptureProgress(sessionId, mac, elapsedTime.toInt(), elapsedTime.toInt(), System.currentTimeMillis(), outputFile)
                                 CaptureRepository.updateDeviceCaptureState(sessionId, mac, false)
                                 sendDeviceProgressUpdate(sessionId, mac, elapsedTime.toInt(), elapsedTime.toInt(), System.currentTimeMillis(), outputFile)
@@ -222,19 +191,15 @@ class PacketCapturer(private val context: Context) {
                         callback(exitCode == 0, outputFile)
 
                     } else {
-                        callback(false, "IP não encontrado")
+                        callback(false, "IP not found")
                     }
                 } catch (e: InterruptedException) {
-                    Log.d("CAPTURE", "Thread interrompida para $key")
+                    Log.d("CAPTURE", "Thread interrupted for $key")
                 } finally {
                     timeCaptureThreads.remove(key)
-                    //timeCaptureRunning.remove(key)
-                    Log.d("CAPTURE", "Cleanup finalizado para $key")
                 }
             }
             timeCaptureThreads[key] = captureThread
-            Log.d("CAPTURE", "captureThread: $captureThread")
-            Log.d("CAPTURE", "timeCaptureThreads[key]: $timeCaptureThreads[key]")
             captureThread.start()
 
         }
@@ -255,14 +220,14 @@ class PacketCapturer(private val context: Context) {
                 }
             }
         } catch (e: Exception) {
-            Log.e("NetworkScanner", "Erro ao obter IP ativo", e)
+            Log.e("NetworkScanner", "Error getting active IP", e)
         }
         return null
     }
 
     private fun getNetworkPrefix(ipAddress: String): String {
         val parts = ipAddress.split(".")
-        return if (parts.size == 4) "${parts[0]}.${parts[1]}.${parts[2]}." else "192.168.43." // hotspot padrão
+        return if (parts.size == 4) "${parts[0]}.${parts[1]}.${parts[2]}." else "192.168.43."
     }
 
     fun stopDeviceCapture(device: Device): Boolean {
@@ -274,14 +239,11 @@ class PacketCapturer(private val context: Context) {
 
             val key = "${device.sessionId}_${device.mac.lowercase()}"
 
-            Log.d("STOPPED", "Tentando parar com key: $key")
-
             val thread = timeCaptureThreads[key]
 
             val killProcess = Runtime.getRuntime().exec("su")
             val killOutputStream = DataOutputStream(killProcess.outputStream)
 
-            //killOutputStream.writeBytes("pkill -SIGINT -f \"tcpdump.*$sessionId\"\n")
             killOutputStream.writeBytes("pkill -SIGINT -f \"tcpdump.*${device.mac}_${device.sessionId}\"\n")
             killOutputStream.writeBytes("exit\n")
             killOutputStream.flush()
@@ -290,9 +252,8 @@ class PacketCapturer(private val context: Context) {
 
             if (thread != null) {
                 thread.interrupt()
-                Log.d("STOPPED", "Thread interrompida: $thread")
             } else {
-                Log.d("STOPPED", "⚠Thread não encontrada: $thread")
+                Log.d("STOPPED", "Thread not found")
             }
 
             true
@@ -301,10 +262,9 @@ class PacketCapturer(private val context: Context) {
             Log.e("TCPDUMP", "Error stopping tcpdump for device ${device.mac} in session ${device.sessionId}", e)
             false
         }
-
     }
 
-    // Adicione esta função na classe PacketCapturer
+
     private fun uploadPcapToFirebase(context: Context, filePath: String, outputFile: String, sessionId: String, mac: String) {
         val storage = FirebaseStorage.getInstance()
         val userId = FirebaseAuth.getInstance().currentUser?.uid ?: return
@@ -315,25 +275,42 @@ class PacketCapturer(private val context: Context) {
             return
         }
 
-        // Crie uma referência única para o arquivo no Storage
+        val MAX_FILE_SIZE_BYTES = 400 * 1024 * 1024 // 400MB
+        val fileSize = file.length()
+
+        if (fileSize > MAX_FILE_SIZE_BYTES) {
+            Log.e("UPLOAD", "PCAP file too large (${fileSize / (1024 * 1024)}MB). Max allowed: ${MAX_FILE_SIZE_BYTES / (1024 * 1024)}MB")
+            return // Cancel upload
+        }
+
+        var currentRetry = 0
+        val maxRetries: Int = 5
+        val initialDelayMs: Long = 2000
         val fileName = "pcaps/${userId}/${mac}/${outputFile}_${mac}_${sessionId}.pcap"
         val storageRef = storage.reference.child(fileName)
 
-        // Upload do arquivo (sem listener de progresso)
-        storageRef.putFile(Uri.fromFile(file))
-            .addOnSuccessListener {
-                // Get the download URL
-                storageRef.downloadUrl.addOnSuccessListener { uri ->
-                    val downloadUrl = uri.toString()
-                    Log.d("UPLOAD", "Upload successful. URL: $downloadUrl")
-
-                    // Atualizar o Firestore com a URL do arquivo (silenciosamente)
-                    updatePcapUrlInFirestore(sessionId, mac, downloadUrl)
+        fun attemptUpload() {
+            storageRef.putFile(Uri.fromFile(file))
+                .addOnSuccessListener {
+                    storageRef.downloadUrl.addOnSuccessListener { uri ->
+                        Log.d("UPLOAD", "Upload success: ${uri.toString()}")
+                        updatePcapUrlInFirestore(sessionId, mac, uri.toString())
+                    }
                 }
-            }
-            .addOnFailureListener { exception ->
-                Log.e("UPLOAD", "Upload failed", exception)
-            }
+                .addOnFailureListener { exception ->
+                    if (currentRetry < maxRetries) {
+                        currentRetry++
+                        val nextDelay = initialDelayMs * (2.0.pow(currentRetry.toDouble())).toLong()
+                        Log.w("UPLOAD", "Retry $currentRetry in ${nextDelay / 1000}s...")
+                        Handler(Looper.getMainLooper()).postDelayed(::attemptUpload, nextDelay)
+                    } else {
+                        Log.e("UPLOAD", "Max retries reached")
+                    }
+                }
+        }
+
+        attemptUpload()
+
     }
 
     private fun updatePcapUrlInFirestore(sessionId: String, mac: String, downloadUrl: String) {

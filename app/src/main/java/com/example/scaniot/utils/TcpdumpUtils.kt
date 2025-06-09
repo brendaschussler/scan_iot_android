@@ -3,24 +3,19 @@ package com.example.scaniot.utils
 import android.content.Context
 import android.os.Handler
 import android.os.Looper
-import android.util.Log
 import android.widget.Toast
 import java.io.DataOutputStream
 
 object TcpdumpUtils {
 
-    /**
-     * Verifica se o tcpdump está acessível no mesmo contexto da captura
-     */
     fun checkTcpdumpAvailable(context: Context, callback: (Boolean) -> Unit) {
         Thread {
             try {
-                // Executa no mesmo contexto que sua captura (via su)
+
                 val process = Runtime.getRuntime().exec("su")
                 val outputStream = DataOutputStream(process.outputStream)
                 val inputStream = process.inputStream.bufferedReader()
 
-                // Comando que verifica o tcpdump
                 outputStream.apply {
                     writeBytes("tcpdump --version >/dev/null 2>&1 && echo '1' || echo '0'\n")
                     writeBytes("exit\n")
@@ -37,7 +32,7 @@ object TcpdumpUtils {
                     } else {
                         Toast.makeText(
                             context,
-                            "tcpdump não disponível no ambiente root",
+                            "Tcpdump command not available, please install following the tutorial in the help icon",
                             Toast.LENGTH_LONG
                         ).show()
                         callback(false)
@@ -47,7 +42,7 @@ object TcpdumpUtils {
                 Handler(Looper.getMainLooper()).post {
                     Toast.makeText(
                         context,
-                        "Erro na verificação: ${e.message}",
+                        "Verification error: ${e.message}",
                         Toast.LENGTH_LONG
                     ).show()
                     callback(false)
@@ -59,7 +54,7 @@ object TcpdumpUtils {
     fun checkTimeoutInstalled(context: Context, callback: (Boolean) -> Unit) {
         Thread {
             try {
-                // Verifica se o timeout está disponível
+
                 val process = Runtime.getRuntime().exec(arrayOf("su", "-c", "which timeout || command -v timeout"))
                 val isInstalled = process.waitFor() == 0
 
@@ -69,7 +64,7 @@ object TcpdumpUtils {
                     } else {
                         Toast.makeText(
                             context,
-                            "timeout não disponível no ambiente root",
+                            "Timeout command not available, please install following the tutorial in the help icon",
                             Toast.LENGTH_LONG
                         ).show()
                         callback(false)

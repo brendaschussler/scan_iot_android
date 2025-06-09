@@ -13,15 +13,16 @@ class SavedDevicesAdapter(
 ) : RecyclerView.Adapter<SavedDevicesAdapter.SavedDeviceViewHolder>() {
 
     private var devicesList = emptyList<Device>()
-    private val selectedDevices = mutableSetOf<String>() // Usa MAC como identificador único
+    private val selectedDevices = mutableSetOf<String>()
 
     fun getSelectedDevices(): List<Device> {
         return devicesList.filter { selectedDevices.contains(it.mac) }
     }
 
     fun submitList(newList: List<Device>) {
+        selectedDevices.retainAll { mac -> newList.any { it.mac == mac } }
+
         devicesList = newList.sortedBy { it.name?.lowercase() }
-        //selectedDevices.clear() // Limpa seleções ao atualizar a lista
         notifyDataSetChanged()
     }
 
@@ -42,7 +43,7 @@ class SavedDevicesAdapter(
                 txtTypeSaved.text = device.deviceType ?: "Not specified"
                 txtCategorySaved.text = device.deviceCategory ?: "Not specified"
 
-                // Carrega a imagem do dispositivo
+
                 if (device.photoUrl != null) {
                     Glide.with(itemView.context)
                         .load(device.photoUrl)
@@ -52,17 +53,14 @@ class SavedDevicesAdapter(
                     imgDeviceSaved.setImageResource(R.drawable.ic_device_unknown)
                 }
 
-                // Configura o botão de delete
                 btnDeleteDevice.setOnClickListener {
                     onDeleteClick(device)
                 }
 
                 checkBoxSavedDevice.setOnCheckedChangeListener(null)
 
-                // Sincroniza o estado visual com a lista de selecionados
                 checkBoxSavedDevice.isChecked = selectedDevices.contains(device.mac)
 
-                // Configura o listener corretamente
                 checkBoxSavedDevice.setOnCheckedChangeListener { _, isChecked ->
                     if (isChecked) {
                         selectedDevices.add(device.mac)

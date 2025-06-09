@@ -116,8 +116,6 @@ class RegisterViewModel : ViewModel() {
         val emailDomain = email.substringAfterLast('@').lowercase()
         Log.d("EMAIL", "emailDomain: $emailDomain")
 
-        Log.d("EMAIL", "isEmailInstitutional: ${!personalEmailDomains.any { emailDomain.endsWith(it) }}")
-
         return !personalEmailDomains.any { emailDomain.endsWith(it) }
     }
 

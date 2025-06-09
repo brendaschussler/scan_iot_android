@@ -1,4 +1,4 @@
-// CapturedPacketsActivity.kt
+
 package com.example.scaniot
 
 import android.app.AlertDialog
@@ -8,9 +8,6 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.os.Build
 import android.os.Bundle
-import android.os.Handler
-import android.os.Looper
-import android.util.Log
 import android.widget.Toast
 import androidx.activity.enableEdgeToEdge
 import androidx.appcompat.app.AppCompatActivity
@@ -19,16 +16,10 @@ import androidx.core.view.WindowInsetsCompat
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.example.scaniot.databinding.ActivityCapturedPacketsBinding
 import com.example.scaniot.model.CaptureRepository
-import com.example.scaniot.LoginActivity
 import com.example.scaniot.model.CapturedPacketsAdapter
-import com.example.scaniot.model.CaptureSession
 import com.example.scaniot.model.Device
 import com.example.scaniot.model.PacketCapturer
 import com.google.firebase.auth.FirebaseAuth
-import com.google.firebase.firestore.ListenerRegistration
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
 
 class CapturedPacketsActivity : AppCompatActivity() {
 
@@ -116,7 +107,6 @@ class CapturedPacketsActivity : AppCompatActivity() {
 
         CaptureRepository.getAllCaptureSessions(
             onSuccess = { sessions ->
-                // Flatten the list of devices from all sessions
                 val allDevices = sessions.flatMap { session ->
                     session.devices.map { device -> device.copy(sessionId = session.sessionId) }
                 }

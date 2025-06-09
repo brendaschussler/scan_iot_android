@@ -3,11 +3,9 @@ package com.example.scaniot.model
 import android.app.AlertDialog
 import android.content.Context
 import android.util.Log
-import android.widget.Toast
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
-import com.google.firebase.firestore.ListenerRegistration
 import com.google.firebase.firestore.Query
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.tasks.await
@@ -97,7 +95,6 @@ object CaptureRepository {
                 "name" to device.name,
                 "mac" to device.mac,
                 "captureTotal" to if (selectedDevices.any { it.mac == device.mac }) (if (timeLimitMs > 0) 0 else packetCount) else 0,
-                //"timeLimitMs" to if (selectedDevices.any { it.mac == device.mac }) timeLimitMs else 0,
                 "timeLimitMs" to timeLimitMs,
                 "captureProgress" to 0,
                 "capturing" to selectedDevices.any { it.mac == device.mac },
@@ -158,7 +155,7 @@ object CaptureRepository {
 
         PacketCapturer(context).captureByTime(macList, timeLimit, outputFile, sessionId) { success, message ->
             if (success)  {
-                Log.d("OK", "Success, iniciando captura")
+                Log.d("OK", "Success")
             } else {
                 Log.d("OK", "error")
             }
@@ -173,16 +170,16 @@ object CaptureRepository {
         sessionId: String
     ) {
         AlertDialog.Builder(context)
-            .setTitle("Acesso Root Necessário")
-            .setMessage("Este recurso requer permissões de superusuário. Por favor, conceda o acesso root quando solicitado.")
-            .setPositiveButton("Tentar Novamente") { _, _ ->
+            .setTitle("Root Access Required")
+            .setMessage("This feature requires superuser permissions. Please grant root access when prompted.")
+            .setPositiveButton("Try Again") { _, _ ->
                 if (checkRootAccess()) {
                     startCaptureTime(context, selectedDevices, timeLimit, outputFile, sessionId)
                 } else {
                     showRootRequiredDialogTime(context, selectedDevices, timeLimit, outputFile, sessionId)
                 }
             }
-            .setNegativeButton("Cancelar", null)
+            .setNegativeButton("Cancel", null)
             .setCancelable(false)
             .show()
     }
@@ -197,40 +194,18 @@ object CaptureRepository {
         }
     }
 
-    fun isDeviceCapturing(sessionId: String, mac: String, callback: (Boolean) -> Unit) {
-        val userId = auth.currentUser?.uid ?: run {
-            callback(false)
-            return
-        }
-
-        firestore.collection("captured_list")
-            .document(userId)
-            .collection("captures")
-            .document(sessionId)
-            .get()
-            .addOnSuccessListener { document ->
-                val devices = document.get("devices") as? Map<String, Map<String, Any>> ?: emptyMap()
-                val deviceData = devices[mac]
-                val isCapturing = deviceData?.get("capturing") as? Boolean ?: false
-                callback(isCapturing)
-            }
-            .addOnFailureListener {
-                callback(false)
-            }
-    }
-
     private fun showRootRequiredDialog(context: Context, selectedDevices: List<Device>, packetCount: Int, outputFile: String, sessionId: String) {
         AlertDialog.Builder(context)
-            .setTitle("Acesso Root Necessário")
-            .setMessage("Este recurso requer permissões de superusuário. Por favor, conceda o acesso root quando solicitado.")
-            .setPositiveButton("Tentar Novamente") { _, _ ->
+            .setTitle("Root Access Required")
+            .setMessage("This feature requires superuser permissions. Please grant root access when prompted.")
+            .setPositiveButton("Try Again") { _, _ ->
                 if (checkRootAccess()) {
                     startCapture(context, selectedDevices, packetCount, outputFile, sessionId)
                 } else {
                     showRootRequiredDialog(context, selectedDevices, packetCount, outputFile, sessionId)
                 }
             }
-            .setNegativeButton("Cancelar", null)
+            .setNegativeButton("Cancel", null)
             .setCancelable(false)
             .show()
     }
@@ -246,67 +221,18 @@ object CaptureRepository {
 
         PacketCapturer(context).capture(macList, packetCount, outputFile, sessionId) { success, message ->
             if (success)  {
-                Log.d("OK", "Success, iniciando captura")
+                Log.d("OK", "Success")
             } else {
                 Log.d("OK", "error")
             }
         }
     }
 
-    fun deleteCaptureSession(sessionId: String, onComplete: (Boolean) -> Unit) {
-        val userId = auth.currentUser?.uid ?: run {
-            onComplete(false)
-            return
-        }
 
-        firestore.collection("captured_list")
-            .document(userId)
-            .collection("captures")
-            .document(sessionId)
-            .delete()
-            .addOnSuccessListener { onComplete(true) }
-            .addOnFailureListener { onComplete(false) }
-    }
-
-    fun deleteDeviceCapture(sessionId: String, mac: String, onComplete: (Boolean) -> Unit) {
-        val userId = auth.currentUser?.uid ?: run {
-            onComplete(false)
-            return
-        }
-
-        firestore.collection("captured_list")
-            .document(userId)
-            .collection("captures")
-            .document(sessionId)
-            .update(
-                "devices.$mac", FieldValue.delete(),
-                "lastUpdated", FieldValue.serverTimestamp()
-            )
-            .addOnSuccessListener { onComplete(true) }
-            .addOnFailureListener { onComplete(false) }
-
-        // Verifica se a sessão ficou vazia após deletar o dispositivo
-        firestore.collection("captured_list")
-            .document(userId)
-            .collection("captures")
-            .document(sessionId)
-            .get()
-            .addOnSuccessListener { doc ->
-                val devices = doc.get("devices") as? Map<*, *>
-                if (devices.isNullOrEmpty()) {
-                    // Deleta a sessão inteira se não houver mais dispositivos
-                    doc.reference.delete()
-                }
-            }
-    }
-
-
-    // Adicione esta função suspensa no CaptureRepository
     suspend fun suspendDeleteDeviceCapture(sessionId: String, mac: String): Boolean = withContext(Dispatchers.IO) {
         try {
             val userId = FirebaseAuth.getInstance().currentUser?.uid ?: return@withContext false
 
-            // Primeiro deleta o dispositivo
             firestore.collection("captured_list")
                 .document(userId)
                 .collection("captures")
@@ -314,9 +240,8 @@ object CaptureRepository {
                 .update(
                     "devices.$mac", FieldValue.delete(),
                     "lastUpdated", FieldValue.serverTimestamp()
-                ).await() // Usando await() em vez de callbacks
+                ).await()
 
-            // Verifica se a sessão ficou vazia
             val doc = firestore.collection("captured_list")
                 .document(userId)
                 .collection("captures")

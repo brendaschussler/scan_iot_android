@@ -168,7 +168,7 @@ class ScanDevicesActivity : AppCompatActivity() {
                 if (scannedDevices.isEmpty()) {
                     Toast.makeText(
                         this@ScanDevicesActivity,
-                        "Nenhum dispositivo encontrado na rede",
+                        "No devices found on the network",
                         Toast.LENGTH_SHORT
                     ).show()
                 }
@@ -177,10 +177,10 @@ class ScanDevicesActivity : AppCompatActivity() {
             } catch (e: Exception) {
                 Toast.makeText(
                     this@ScanDevicesActivity,
-                    "Erro no scan: ${e.message}",
+                    "Network scanning error: ${e.message}",
                     Toast.LENGTH_SHORT
                 ).show()
-                Log.e("NetworkScan", "Erro ao escanear rede", e)
+                Log.e("NetworkScan", "Network scanning error", e)
             } finally {
                 binding.rvListScanDevices.visibility = View.VISIBLE
                 binding.btnStartScan.isEnabled = true
@@ -209,48 +209,43 @@ class ScanDevicesActivity : AppCompatActivity() {
                     .addOnSuccessListener { notSavedDocuments ->
                         val existingNotSavedDevices = notSavedDocuments.map { it.toObject(Device::class.java) }
 
-                        // Identificar novos dispositivos escaneados que não estão salvos
                         val newDevices = scannedDevices.filter { scannedDevice ->
                             !savedDevices.any { it.mac == scannedDevice.mac } &&
                                     !existingNotSavedDevices.any { it.mac == scannedDevice.mac }
                         }
 
-                        // Adicionar novos dispositivos à coleção de não salvos
                         if (newDevices.isNotEmpty()) {
                             saveNewDevicesToNotSaved(newDevices)
                         }
 
-                        // Lista para armazenar dispositivos que precisam atualizar o IP no Firebase
                         val devicesToUpdate = mutableListOf<Device>()
 
-                        // Criar lista final combinando informações
                         val allDevices = scannedDevices.map { scannedDevice ->
                             when {
-                                // Dispositivo salvo - mantém todas as informações salvas, mas atualiza o IP
+
                                 savedDevices.any { it.mac == scannedDevice.mac } -> {
                                     val savedDevice = savedDevices.first { it.mac == scannedDevice.mac }
                                     if (savedDevice.ip != scannedDevice.ip) {
-                                        // Se o IP mudou, adiciona à lista de atualização
                                         devicesToUpdate.add(savedDevice.copy(ip = scannedDevice.ip))
                                     }
                                     savedDevice.copy(
-                                        ip = scannedDevice.ip, // Atualiza apenas o IP
+                                        ip = scannedDevice.ip,
                                         isNew = false
                                     )
                                 }
-                                // Dispositivo não salvo mas já escaneado antes
+
                                 existingNotSavedDevices.any { it.mac == scannedDevice.mac } -> {
                                     val notSavedDevice = existingNotSavedDevices.first { it.mac == scannedDevice.mac }
                                     notSavedDevice.copy(
-                                        ip = scannedDevice.ip // Atualiza apenas o IP
+                                        ip = scannedDevice.ip
                                     )
                                 }
-                                // Novo dispositivo nunca visto antes
+                                // New device
                                 else -> scannedDevice.copy(isNew = true)
                             }
                         }
 
-                        // Atualizar IPs no Firebase se necessário
+                        // Updates IPs on Firebase if necessary
                         if (devicesToUpdate.isNotEmpty()) {
                             updateIpsInFirebase(devicesToUpdate)
                         }
@@ -282,10 +277,10 @@ class ScanDevicesActivity : AppCompatActivity() {
 
         batch.commit()
             .addOnSuccessListener {
-                Log.d("ScanDevices", "IPs atualizados com sucesso para ${devices.size} dispositivos")
+
             }
             .addOnFailureListener { e ->
-                Log.e("ScanDevices", "Erro ao atualizar IPs: ${e.message}")
+                Log.e("ScanDevices", "Error when updating IPs: ${e.message}")
             }
     }
 
@@ -312,8 +307,8 @@ class ScanDevicesActivity : AppCompatActivity() {
             onEditClick = { device ->
                 showEditDialog(device)
             },
-            savedDevices = emptyList(), // Será atualizado em loadDevicesWithSavedData
-            scannedNotSavedDevices = emptyList() // Será atualizado em loadDevicesWithSavedData
+            savedDevices = emptyList(),
+            scannedNotSavedDevices = emptyList()
         )
 
         binding.rvListScanDevices.apply {
@@ -331,7 +326,6 @@ class ScanDevicesActivity : AppCompatActivity() {
         val dialogView = LayoutInflater.from(this).inflate(R.layout.dialog_edit_device, null)
         currentDialogView = dialogView
 
-        // Configurar o AutoCompleteTextView para as categorias
         val categories = arrayOf(
             "Camera",
             "Game Console",
@@ -364,7 +358,6 @@ class ScanDevicesActivity : AppCompatActivity() {
         val categoryInput = dialogView.findViewById<AutoCompleteTextView>(R.id.editCategory)
         categoryInput.setAdapter(adapter)
 
-        // Definir a categoria atual do dispositivo, se existir
         device.deviceCategory?.let {
             categoryInput.setText(it, false)
         }
@@ -448,7 +441,6 @@ class ScanDevicesActivity : AppCompatActivity() {
                             val updatedDeviceGlr = device.copy(photoUrl = urlFirebase.toString())
 
                             updateDeviceData(thisMac, dados)
-                            //scanDevicesAdapter.updateDevice(updatedDeviceGlr)
                             loadDevicesWithSavedData()
                         }
                 }
@@ -471,7 +463,6 @@ class ScanDevicesActivity : AppCompatActivity() {
                             val updatedDeviceCam = device.copy(photoUrl = urlFirebase.toString())
 
                             updateDeviceData(thisMac, dados)
-                            //scanDevicesAdapter.updateDevice(updatedDeviceCam)
                             loadDevicesWithSavedData()
 
                         }

@@ -3,13 +3,10 @@ package com.example.scaniot.model
 import android.app.AlertDialog
 import android.os.Handler
 import android.os.Looper
-import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.Toast
-import androidx.lifecycle.LifecycleOwner
-import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.ListAdapter
 import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.RecyclerView
@@ -62,7 +59,6 @@ class CapturedPacketsAdapter : ListAdapter<Device, CapturedPacketsAdapter.Device
                 txtSessionId.text = "Device: ${device.name}"
                 txtDevicesCount.text = "MAC: ${device.mac}"
                 txtCaptureType.text = "Output Filename: ${device.filename}_${device.mac}_${device.sessionId}"
-                //txtCaptureType.text = "Type: ${if (device.timeLimitMs > 0) "TIME LIMIT" else "PACKET COUNT"}"
 
                 progressBarSession.max = device.captureTotal
                 progressBarSession.progress = device.captureProgress
@@ -73,9 +69,7 @@ class CapturedPacketsAdapter : ListAdapter<Device, CapturedPacketsAdapter.Device
                     0
                 }
 
-                // Determinar o tipo de captura e formatar as mensagens
                 val captureType = if (device.timeLimitMs > 0) {
-                    // Formatar o tempo limite para uma string legível
                     val hours = device.timeLimitMs / (1000 * 60 * 60)
                     val minutes = (device.timeLimitMs % (1000 * 60 * 60)) / (1000 * 60)
                     val seconds = (device.timeLimitMs % (1000 * 60)) / 1000
@@ -91,8 +85,6 @@ class CapturedPacketsAdapter : ListAdapter<Device, CapturedPacketsAdapter.Device
                 }
 
                 btnStopSession.visibility = if (device.capturing) View.VISIBLE else View.GONE
-
-
 
                 btnStopSession.setOnClickListener {
                     stopDeviceCapture(device)
@@ -114,7 +106,7 @@ class CapturedPacketsAdapter : ListAdapter<Device, CapturedPacketsAdapter.Device
                         if (hasRoot) {
                             executeStopCapture(device)
                         } else {
-                            // Mensagem de erro já é mostrada pelo RootUtils
+                            // RootUtils shows error message
                         }
                     }
 
@@ -123,7 +115,7 @@ class CapturedPacketsAdapter : ListAdapter<Device, CapturedPacketsAdapter.Device
         }
 
         private fun executeStopCapture(device: Device) {
-            // 1. Primeiro atualiza a UI imediatamente (feedback visual rápido)
+
             val currentList = currentList.toMutableList()
             val position = currentList.indexOfFirst { it.mac == device.mac && it.sessionId == device.sessionId }
 
@@ -131,19 +123,15 @@ class CapturedPacketsAdapter : ListAdapter<Device, CapturedPacketsAdapter.Device
                 val updatedDevice = currentList[position].copy(capturing = false)
                 currentList[position] = updatedDevice
                 submitList(currentList)
-                notifyItemChanged(position) // Força a atualização do item específico
+                notifyItemChanged(position)
             }
 
-            // 2. Depois executa as operações em background
             Thread {
-                // Operações de I/O (banco de dados e rede)
                 val packetCapturer = PacketCapturer(binding.root.context)
                 packetCapturer.stopDeviceCapture(device)
                 CaptureRepository.updateDeviceCaptureState(device.sessionId, device.mac, false)
 
-                // 3. Verificação final para garantir consistência
                 Handler(Looper.getMainLooper()).post {
-                    // Atualiza novamente para garantir sincronização
                     val freshList = currentList.toMutableList()
                     val freshPosition = freshList.indexOfFirst { it.mac == device.mac && it.sessionId == device.sessionId }
 
@@ -162,17 +150,14 @@ class CapturedPacketsAdapter : ListAdapter<Device, CapturedPacketsAdapter.Device
                 .setMessage("Delete capture data for ${device.name}?")
                 .setNegativeButton("Cancel") { dialog, _ -> dialog.dismiss() }
                 .setPositiveButton("Delete") { _, _ ->
-                    // Iniciar uma corrotina para a operação de delete
                     CoroutineScope(Dispatchers.IO).launch {
                         try {
                             val success = withContext(Dispatchers.IO) {
-                                // Chamada suspensa para a operação de delete
                                 suspendDeleteDeviceCapture(device.sessionId, device.mac)
                             }
 
                             withContext(Dispatchers.Main) {
                                 if (success) {
-                                    // Remove da lista local
                                     val newList = currentList.toMutableList().apply {
                                         removeAt(adapterPosition)
                                     }

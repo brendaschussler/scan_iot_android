@@ -1,25 +1,13 @@
 package com.example.scaniot.model
 
 import android.content.Context
-import android.net.ConnectivityManager
-import android.net.LinkAddress
-import android.net.NetworkCapabilities
-import android.os.Build
 import android.util.Log
 import java.net.InetAddress
 import kotlinx.coroutines.*
-import java.io.BufferedReader
 import java.io.DataOutputStream
-import java.io.File
-import java.io.InputStreamReader
 import java.net.NetworkInterface
-import okhttp3.OkHttpClient
-import okhttp3.Request
-import org.json.JSONObject
-
 
 class NetworkScanner(private val context: Context) {
-
 
     private fun getActiveIpAddress(): String? {
         try {
@@ -31,19 +19,57 @@ class NetworkScanner(private val context: Context) {
                 while (addresses.hasMoreElements()) {
                     val addr = addresses.nextElement()
                     if (!addr.isLoopbackAddress && addr is InetAddress && addr.hostAddress.indexOf(':') < 0) {
-                        return addr.hostAddress // IPv4 válido
+                        return addr.hostAddress
                     }
                 }
             }
         } catch (e: Exception) {
-            Log.e("NetworkScanner", "Erro ao obter IP ativo", e)
+            Log.e("NetworkScanner", "Error getting active IP", e)
         }
         return null
     }
 
+    fun getPreferredIpAddress(): String? {
+        val hotspotKeywords = listOf("ap", "softap", "wlan1", "wlan2", "swlan")
+        var fallbackIp: String? = null
+
+        try {
+            val interfaces = NetworkInterface.getNetworkInterfaces()
+            for (intf in interfaces) {
+                val name = intf.name ?: continue
+                if (!intf.isUp || intf.isLoopback) continue
+
+                val addresses = intf.inetAddresses
+                while (addresses.hasMoreElements()) {
+                    val addr = addresses.nextElement()
+                    if (!addr.isLoopbackAddress && addr is InetAddress && addr.hostAddress.indexOf(':') < 0) {
+                        val ip = addr.hostAddress
+
+                        // Se for interface típica de hotspot, retorna imediatamente
+                        if (hotspotKeywords.any { keyword -> name.contains(keyword) }) {
+                            Log.d("IP", "$ip")
+                            return ip
+                        }
+
+                        // Senão, salva como fallback se ainda não tiver um
+                        if (fallbackIp == null) {
+                            Log.d("IP", "$ip")
+                            fallbackIp = ip
+                        }
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            Log.e("NetworkScanner", "Erro ao obter IP", e)
+        }
+
+        // Se não achou IP de hotspot, retorna o primeiro IP válido encontrado
+        return fallbackIp
+    }
+
     private fun getNetworkPrefix(ipAddress: String): String {
         val parts = ipAddress.split(".")
-        return if (parts.size == 4) "${parts[0]}.${parts[1]}.${parts[2]}." else "192.168.43." // hotspot padrão
+        return if (parts.size == 4) "${parts[0]}.${parts[1]}.${parts[2]}." else "192.168.43."
     }
 
     suspend fun getConnectedHotspotDevices(): List<Device> = withContext(Dispatchers.IO) {
@@ -55,7 +81,6 @@ class NetworkScanner(private val context: Context) {
         val outputStream = DataOutputStream(suProcess.outputStream)
         val inputStream = suProcess.inputStream
 
-        // Envia o comando para obter dispositivos da subrede via ip neigh
         val command = "ip neigh | grep '^$networkPrefix'\n"
         outputStream.writeBytes(command)
         outputStream.writeBytes("exit\n")

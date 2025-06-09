@@ -26,7 +26,7 @@ object MacVendorResolver {
 
         val request = Request.Builder()
             .url(url)
-            .header("User-Agent", "ScanIOTApp") // obrigatório
+            .header("User-Agent", "ScanIOTApp")
             .build()
 
         try {
