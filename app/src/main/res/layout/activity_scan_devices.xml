@@ -7,7 +7,6 @@
     android:layout_height="match_parent"
     tools:context=".ScanDevicesActivity">
 
-    <!-- Toolbar e Logout (mantidos do seu layout original) -->
     <include
         android:id="@+id/includeTbScanDevices"
         layout="@layout/toolbar_main"
@@ -37,12 +36,24 @@
         android:orientation="horizontal"
         app:layout_constraintGuide_percent="0.06" />
 
+    <SearchView
+        android:id="@+id/searchView"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="20dp"
+        android:layout_marginTop="8dp"
+        android:layout_marginEnd="20dp"
+        android:queryHint="Search devices..."
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@+id/textView7" />
+
     <androidx.recyclerview.widget.RecyclerView
         android:id="@+id/rvListScanDevices"
         android:layout_width="0dp"
         android:layout_height="0dp"
         android:layout_marginStart="20dp"
-        android:layout_marginTop="10dp"
+        android:layout_marginTop="8dp"
         android:layout_marginEnd="20dp"
         android:layout_marginBottom="20dp"
         android:fadeScrollbars="false"
@@ -55,8 +66,9 @@
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintHorizontal_bias="0.5"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@+id/textView7"
+        app:layout_constraintTop_toBottomOf="@+id/searchView"
         tools:listitem="@layout/item_device" />
+
 
     <Button
         android:id="@+id/btnStartScan"
@@ -99,11 +111,5 @@
         app:layout_constraintStart_toStartOf="@+id/rvListScanDevices"
         app:layout_constraintTop_toTopOf="@+id/rvListScanDevices" />
 
-
-    <!-- Novo: SearchView para filtrar dispositivos -->
-
-    <!-- Lista de dispositivos -->
-
-    <!-- ProgressBar para carregamento -->
 
 </androidx.constraintlayout.widget.ConstraintLayout>

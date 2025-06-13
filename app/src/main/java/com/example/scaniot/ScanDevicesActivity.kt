@@ -39,6 +39,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.ByteArrayOutputStream
 import java.util.UUID
+import android.widget.SearchView
 
 class ScanDevicesActivity : AppCompatActivity() {
 
@@ -84,6 +85,8 @@ class ScanDevicesActivity : AppCompatActivity() {
         android.Manifest.permission.INTERNET
     )
 
+    private var allDevices = emptyList<Device>()
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
@@ -98,6 +101,7 @@ class ScanDevicesActivity : AppCompatActivity() {
         initializeToolbar()
         setupRecyclerView()
         initializeClickEvents()
+        setupSearchView()
 
         openGalleryLauncher = registerForActivityResult(ActivityResultContracts.GetContent()) { uri ->
             if (uri != null) {
@@ -134,6 +138,36 @@ class ScanDevicesActivity : AppCompatActivity() {
             v.setPadding(systemBars.left, systemBars.top, systemBars.right, systemBars.bottom)
             insets
         }
+    }
+
+    private fun setupSearchView() {
+        binding.searchView.setOnQueryTextListener(object : SearchView.OnQueryTextListener {
+            override fun onQueryTextSubmit(query: String?): Boolean {
+                return false
+            }
+
+            override fun onQueryTextChange(newText: String?): Boolean {
+                filterDevices(newText.orEmpty())
+                return true
+            }
+        })
+    }
+
+    private fun filterDevices(query: String) {
+        val filteredList = if (query.isEmpty()) {
+            allDevices
+        } else {
+            allDevices.filter { device ->
+                device.name?.contains(query, ignoreCase = true) == true ||
+                        device.mac?.contains(query, ignoreCase = true) == true ||
+                        device.ip?.contains(query, ignoreCase = true) == true ||
+                        device.vendor?.contains(query, ignoreCase = true) == true ||
+                        device.deviceModel?.contains(query, ignoreCase = true) == true ||
+                        device.deviceType?.contains(query, ignoreCase = true) == true ||
+                        device.deviceCategory?.contains(query, ignoreCase = true) == true
+            }
+        }
+        scanDevicesAdapter.addList(filteredList)
     }
 
     private fun initializeClickEvents() {
@@ -220,9 +254,8 @@ class ScanDevicesActivity : AppCompatActivity() {
 
                         val devicesToUpdate = mutableListOf<Device>()
 
-                        val allDevices = scannedDevices.map { scannedDevice ->
+                        allDevices = scannedDevices.map { scannedDevice ->
                             when {
-
                                 savedDevices.any { it.mac == scannedDevice.mac } -> {
                                     val savedDevice = savedDevices.first { it.mac == scannedDevice.mac }
                                     if (savedDevice.ip != scannedDevice.ip) {
@@ -514,7 +547,8 @@ class ScanDevicesActivity : AppCompatActivity() {
     }
 
     private fun loadDevices() {
-        scanDevicesAdapter.addList(scannedDevices)
+        allDevices = scannedDevices
+        scanDevicesAdapter.addList(allDevices)
     }
 
     private fun initializeToolbar() {

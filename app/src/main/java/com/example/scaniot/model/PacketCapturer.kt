@@ -205,24 +205,39 @@ class PacketCapturer(private val context: Context) {
         }
     }
 
-    private fun getActiveIpAddress(): String? {
+    fun getActiveIpAddress(): String? {
+        val hotspotKeywords = listOf("ap", "softap", "wlan1", "wlan2", "swlan")
+        var fallbackIp: String? = null
+
         try {
             val interfaces = NetworkInterface.getNetworkInterfaces()
             for (intf in interfaces) {
+                val name = intf.name ?: continue
                 if (!intf.isUp || intf.isLoopback) continue
 
                 val addresses = intf.inetAddresses
                 while (addresses.hasMoreElements()) {
                     val addr = addresses.nextElement()
                     if (!addr.isLoopbackAddress && addr is InetAddress && addr.hostAddress.indexOf(':') < 0) {
-                        return addr.hostAddress // IPv4 válido
+                        val ip = addr.hostAddress
+
+                        // Try hotspot interfaces
+                        if (hotspotKeywords.any { keyword -> name.contains(keyword) }) {
+                            return ip
+                        }
+
+                        // Else, any active
+                        if (fallbackIp == null) {
+                            fallbackIp = ip
+                        }
                     }
                 }
             }
         } catch (e: Exception) {
-            Log.e("NetworkScanner", "Error getting active IP", e)
+            Log.e("NetworkScanner", "Error getting IP", e)
         }
-        return null
+
+        return fallbackIp
     }
 
     private fun getNetworkPrefix(ipAddress: String): String {

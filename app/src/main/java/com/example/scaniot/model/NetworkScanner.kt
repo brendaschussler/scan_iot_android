@@ -9,27 +9,8 @@ import java.net.NetworkInterface
 
 class NetworkScanner(private val context: Context) {
 
-    private fun getActiveIpAddress(): String? {
-        try {
-            val interfaces = NetworkInterface.getNetworkInterfaces()
-            for (intf in interfaces) {
-                if (!intf.isUp || intf.isLoopback) continue
 
-                val addresses = intf.inetAddresses
-                while (addresses.hasMoreElements()) {
-                    val addr = addresses.nextElement()
-                    if (!addr.isLoopbackAddress && addr is InetAddress && addr.hostAddress.indexOf(':') < 0) {
-                        return addr.hostAddress
-                    }
-                }
-            }
-        } catch (e: Exception) {
-            Log.e("NetworkScanner", "Error getting active IP", e)
-        }
-        return null
-    }
-
-    fun getPreferredIpAddress(): String? {
+    fun getActiveIpAddress(): String? {
         val hotspotKeywords = listOf("ap", "softap", "wlan1", "wlan2", "swlan")
         var fallbackIp: String? = null
 
@@ -45,25 +26,22 @@ class NetworkScanner(private val context: Context) {
                     if (!addr.isLoopbackAddress && addr is InetAddress && addr.hostAddress.indexOf(':') < 0) {
                         val ip = addr.hostAddress
 
-                        // Se for interface típica de hotspot, retorna imediatamente
+                        // Try hotspot interfaces
                         if (hotspotKeywords.any { keyword -> name.contains(keyword) }) {
-                            Log.d("IP", "$ip")
                             return ip
                         }
 
-                        // Senão, salva como fallback se ainda não tiver um
+                        // Else, any active
                         if (fallbackIp == null) {
-                            Log.d("IP", "$ip")
                             fallbackIp = ip
                         }
                     }
                 }
             }
         } catch (e: Exception) {
-            Log.e("NetworkScanner", "Erro ao obter IP", e)
+            Log.e("NetworkScanner", "Error getting IP", e)
         }
 
-        // Se não achou IP de hotspot, retorna o primeiro IP válido encontrado
         return fallbackIp
     }
 
