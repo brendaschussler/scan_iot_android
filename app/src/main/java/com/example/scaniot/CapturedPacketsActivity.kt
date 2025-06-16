@@ -8,6 +8,8 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.os.Build
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.widget.Toast
 import androidx.activity.enableEdgeToEdge
 import androidx.appcompat.app.AppCompatActivity
@@ -77,6 +79,10 @@ class CapturedPacketsActivity : AppCompatActivity() {
         setupSwipeRefresh()
         loadCaptureSessions()
 
+        Handler(Looper.getMainLooper()).postDelayed({
+            refreshData()
+        }, 1000)
+
         val filter = IntentFilter(PacketCapturer.PROGRESS_UPDATE_ACTION)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             registerReceiver(progressReceiver, filter, Context.RECEIVER_NOT_EXPORTED)
@@ -108,7 +114,19 @@ class CapturedPacketsActivity : AppCompatActivity() {
         CaptureRepository.getAllCaptureSessions(
             onSuccess = { sessions ->
                 val allDevices = sessions.flatMap { session ->
-                    session.devices.map { device -> device.copy(sessionId = session.sessionId) }
+                    session.devices.map { device ->
+                        // Verifica se a captura está marcada como ativa mas não tem thread em execução
+                        if (device.capturing) {
+                            val key = "${device.sessionId}_${device.mac.lowercase()}"
+                            val isActuallyRunning = PacketCapturer.timeCaptureThreads.containsKey(key)
+                            device.copy(
+                                sessionId = session.sessionId,
+                                capturing = isActuallyRunning
+                            )
+                        } else {
+                            device.copy(sessionId = session.sessionId)
+                        }
+                    }
                 }
                 updateDeviceList(allDevices)
                 binding.swipeRefreshLayout.isRefreshing = false

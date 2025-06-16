@@ -51,11 +51,11 @@ class PacketCapturer(private val context: Context) {
 
         val milestones = (1..20).map { it * packetCount / 20 }.distinct()
 
-
         macList.forEach { mac ->
             var nextMilestoneIndex = 0
+            val key = "${sessionId}_${mac.lowercase()}"
 
-            Thread {
+            val captureThread = Thread {
                 try {
                     val process = Runtime.getRuntime().exec("su")
                     val outputStream = DataOutputStream(process.outputStream)
@@ -119,8 +119,24 @@ class PacketCapturer(private val context: Context) {
                     }
                 } catch (e: Exception) {
                     Log.e("TCPDUMP", "Error capturing for MAC $mac", e)
+                    Handler(Looper.getMainLooper()).post {
+                        CaptureRepository.updateDeviceCaptureState(sessionId, mac, false)
+                    }
+                } finally {
+                    timeCaptureThreads.remove(key)
                 }
-            }.start()
+            }
+
+            captureThread.setUncaughtExceptionHandler { _, e ->
+                Log.e("CAPTURE", "Error in capture thread", e)
+                Handler(Looper.getMainLooper()).post {
+                    CaptureRepository.updateDeviceCaptureState(sessionId, mac, false)
+                }
+                timeCaptureThreads.remove(key)
+            }
+
+            timeCaptureThreads[key] = captureThread
+            captureThread.start()
         }
         callback(true, "Capture started for all devices")
     }
@@ -195,10 +211,22 @@ class PacketCapturer(private val context: Context) {
                     }
                 } catch (e: InterruptedException) {
                     Log.d("CAPTURE", "Thread interrupted for $key")
+                    Handler(Looper.getMainLooper()).post {
+                        CaptureRepository.updateDeviceCaptureState(sessionId, mac, false)
+                    }
                 } finally {
                     timeCaptureThreads.remove(key)
                 }
             }
+
+            captureThread.setUncaughtExceptionHandler { _, e ->
+                Log.e("CAPTURE", "Error in capture thread", e)
+                Handler(Looper.getMainLooper()).post {
+                    CaptureRepository.updateDeviceCaptureState(sessionId, mac, false)
+                }
+                timeCaptureThreads.remove(key)
+            }
+
             timeCaptureThreads[key] = captureThread
             captureThread.start()
 
@@ -267,6 +295,7 @@ class PacketCapturer(private val context: Context) {
 
             if (thread != null) {
                 thread.interrupt()
+                timeCaptureThreads.remove(key)
             } else {
                 Log.d("STOPPED", "Thread not found")
             }
@@ -299,8 +328,8 @@ class PacketCapturer(private val context: Context) {
         }
 
         var currentRetry = 0
-        val maxRetries: Int = 5
-        val initialDelayMs: Long = 2000
+        val maxRetries: Int = 8
+        val initialDelayMs: Long = 5000
         val fileName = "pcaps/${userId}/${mac}/${outputFile}_${mac}_${sessionId}.pcap"
         val storageRef = storage.reference.child(fileName)
 
