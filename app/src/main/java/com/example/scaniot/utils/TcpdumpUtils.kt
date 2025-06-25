@@ -8,6 +8,18 @@ import java.io.DataOutputStream
 
 object TcpdumpUtils {
 
+    private val TERMUX_ERROR_PATTERNS = listOf(
+        Regex("no daemon is currently running", RegexOption.IGNORE_CASE),
+        Regex("failed to bind to daemon", RegexOption.IGNORE_CASE),
+        Regex("connection refused|cannot connect to daemon", RegexOption.IGNORE_CASE),
+        Regex("daemon not running", RegexOption.IGNORE_CASE),
+        Regex("termux-api is not running", RegexOption.IGNORE_CASE)
+    )
+
+    fun checkForTermuxErrors(errorOutput: String): Boolean {
+        return TERMUX_ERROR_PATTERNS.any { it.containsMatchIn(errorOutput) }
+    }
+
     fun checkTcpdumpAvailable(context: Context, callback: (Boolean) -> Unit) {
         Thread {
             try {
@@ -15,12 +27,27 @@ object TcpdumpUtils {
                 val process = Runtime.getRuntime().exec("su")
                 val outputStream = DataOutputStream(process.outputStream)
                 val inputStream = process.inputStream.bufferedReader()
+                val errorStream = process.errorStream.bufferedReader()
 
                 outputStream.apply {
                     writeBytes("tcpdump --version >/dev/null 2>&1 && echo '1' || echo '0'\n")
                     writeBytes("exit\n")
                     flush()
                     close()
+                }
+
+                val errorOutput = errorStream.readText().trim()
+
+                if (checkForTermuxErrors(errorOutput)) {
+                    Handler(Looper.getMainLooper()).post {
+                        Toast.makeText(
+                            context,
+                            "Termux system error: Please restart your device",
+                            Toast.LENGTH_LONG
+                        ).show()
+                        callback(false)
+                    }
+                    return@Thread
                 }
 
                 val result = inputStream.readLine()?.trim() == "1"
@@ -32,7 +59,7 @@ object TcpdumpUtils {
                     } else {
                         Toast.makeText(
                             context,
-                            "Tcpdump command not available, please install following the tutorial in the help icon",
+                            "Tcpdump command not available, please install following the tutorial in the system requirements tab",
                             Toast.LENGTH_LONG
                         ).show()
                         callback(false)
@@ -64,7 +91,7 @@ object TcpdumpUtils {
                     } else {
                         Toast.makeText(
                             context,
-                            "Timeout command not available, please install following the tutorial in the help icon",
+                            "Timeout command not available, please install following the tutorial in the system requirements tab",
                             Toast.LENGTH_LONG
                         ).show()
                         callback(false)

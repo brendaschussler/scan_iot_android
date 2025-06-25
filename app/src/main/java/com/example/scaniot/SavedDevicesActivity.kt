@@ -253,8 +253,8 @@ class SavedDevicesActivity : AppCompatActivity() {
                     }
 
                     val totalSeconds = (hours * 3600) + (minutes * 60) + seconds
-                    if (totalSeconds > 43_200) {
-                        Toast.makeText(this, "Total time exceeds maximum limit (12 hours)", Toast.LENGTH_SHORT).show()
+                    if (totalSeconds > 172_800) {
+                        Toast.makeText(this, "Total time exceeds maximum limit (48 hours)", Toast.LENGTH_SHORT).show()
                         return@setPositiveButton
                     }
 
@@ -314,7 +314,7 @@ class SavedDevicesActivity : AppCompatActivity() {
     private fun showTimeoutMessage() {
         AlertDialog.Builder(this)
             .setTitle("Timeout is not installed\n")
-            .setMessage("Timeout is required for packet capture by time limit. Please install it by following the tutorial in help icon")
+            .setMessage("Timeout is required for packet capture by time limit. Please install it by following the tutorial in the system requirements tab")
             .setPositiveButton("Ok") { _, _ ->
             }
             .show()
@@ -323,7 +323,7 @@ class SavedDevicesActivity : AppCompatActivity() {
     private fun showTcpdumpMessage() {
         AlertDialog.Builder(this)
             .setTitle("Tcpdump is not installed\n")
-            .setMessage("Tcpdump is required for packet capture by time limit. Please install it by following the tutorial in help icon")
+            .setMessage("Tcpdump is required for packet capture by time limit. Please install it by following the tutorial in the system requirements tab")
             .setPositiveButton("Ok") { _, _ ->
             }
             .show()

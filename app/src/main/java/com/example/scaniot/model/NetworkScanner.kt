@@ -59,7 +59,8 @@ class NetworkScanner(private val context: Context) {
         val outputStream = DataOutputStream(suProcess.outputStream)
         val inputStream = suProcess.inputStream
 
-        val command = "ip neigh | grep '^$networkPrefix'\n"
+        val command = "ip neigh | grep '^$networkPrefix' | grep -E 'REACHABLE|STALE|DELAY'\n"
+
         outputStream.writeBytes(command)
         outputStream.writeBytes("exit\n")
         outputStream.flush()
@@ -96,8 +97,12 @@ class NetworkScanner(private val context: Context) {
 
     suspend fun getVendorFromMac(mac: String): String {
 
-        val vendor = MacVendorResolver.getVendor(mac)
+        var vendor = MacVendorResolver.getVendor(mac)
         Log.d("MAC", "getVendorFromMac: $vendor")
+
+        if(vendor == "Rate limit exceeded"){
+            vendor = "Unknown Vendor"
+        }
 
         return vendor
     }

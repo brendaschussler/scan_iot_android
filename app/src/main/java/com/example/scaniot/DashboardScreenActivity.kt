@@ -112,6 +112,10 @@ class DashboardScreenActivity : AppCompatActivity() {
 3. Install Termux
 ⚠️ Do NOT install from the Play Store! It is outdated.
 
+🚨️ IMPORTANT NOTICE:
+- Always maintain Termux updated through F-Droid
+- Updates often include critical bug fixes
+
 📥 How to install required commands in Termux:
 Open Termux and paste the command below, then press Enter:
 
@@ -126,6 +130,9 @@ Type 'su' in Termux. If the prompt changes to #, root access is working.
 ✔  Connect the devices you want to scan and capture packets from to this hotspot.
 
 ✅ After this, return to the app and use its features normally.
+
+
+📨 Contact support if you have any issues or questions: droidscour@gmail.com
 
 """.trimIndent()
 

@@ -330,7 +330,7 @@ class ScanDevicesActivity : AppCompatActivity() {
         }
 
         batch.commit().addOnCompleteListener {
-             // list will be updated on next loading
+            // list will be updated on next loading
         }
     }
 
