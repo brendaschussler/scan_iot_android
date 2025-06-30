@@ -146,6 +146,8 @@ class PacketCapturer(private val context: Context) {
 
         val totalSeconds = timeLimit / 1000
         val UPDATE_INTERVAL = max(1, totalSeconds / 20)
+        val UI_UPDATE_PERCENT = 1
+        val FIREBASE_UPDATE_PERCENT = 10
 
         macList.forEach { mac ->
 
@@ -181,26 +183,55 @@ class PacketCapturer(private val context: Context) {
                         outputStream.writeBytes("exit\n")
                         outputStream.flush()
 
-                        for (i in 1..timeSeconds) {
+                        val startTime = System.currentTimeMillis()
+                        var lastUIProgressPercent = -1
+                        var lastFirebaseProgressPercent = -1
+
+                        while (true) {
+                            val currentTime = System.currentTimeMillis()
+                            val elapsedTime = ((currentTime - startTime) / 1000).toInt()
+                            val currentProgressPercent = (elapsedTime * 100) / timeSeconds.toInt()
+
+                            // UI update (1%)
+                            if (currentProgressPercent > lastUIProgressPercent) {
+                                sendDeviceProgressUpdate(
+                                    sessionId,
+                                    mac,
+                                    elapsedTime,
+                                    timeSeconds.toInt(),
+                                    currentTime,
+                                    outputFile
+                                )
+                                lastUIProgressPercent = currentProgressPercent
+                                Log.d("UI Progress", "UI Update: $currentProgressPercent%")
+                            }
+
+                            // Firebase Update (10%)
+                            if (currentProgressPercent > lastFirebaseProgressPercent &&
+                                currentProgressPercent % FIREBASE_UPDATE_PERCENT == 0) {
+                                CaptureRepository.updateDeviceCaptureProgress(
+                                    sessionId,
+                                    mac,
+                                    elapsedTime,
+                                    timeSeconds.toInt(),
+                                    currentTime,
+                                    outputFile
+                                )
+                                lastFirebaseProgressPercent = currentProgressPercent
+                                Log.d("Firebase Progress", "Firebase Update: $currentProgressPercent%")
+                            }
+
+                            if (elapsedTime >= timeSeconds) {
+
+                                CaptureRepository.updateCaptureState(sessionId, false)
+                                CaptureRepository.updateDeviceCaptureProgress(sessionId, mac, timeSeconds.toInt(), timeSeconds.toInt(), System.currentTimeMillis(), outputFile)
+                                CaptureRepository.updateDeviceCaptureState(sessionId, mac, false)
+                                sendDeviceProgressUpdate(sessionId, mac, timeSeconds.toInt(), timeSeconds.toInt(), System.currentTimeMillis(), outputFile)
+                                uploadPcapToFirebase(context, outputFileName, outputFile, sessionId, mac)
+                                break
+                            }
 
                             Thread.sleep(1000)
-                            val elapsedTime = i
-
-                            if ((i % UPDATE_INTERVAL).toInt() == 0){
-                                CaptureRepository.updateDeviceCaptureProgress(sessionId, mac, elapsedTime.toInt(), timeSeconds.toInt(), System.currentTimeMillis(), outputFile)
-                            }
-
-                            Log.d("elapsedTime", "elapsedTime: $elapsedTime / $timeSeconds ")
-
-                            sendDeviceProgressUpdate(sessionId, mac, elapsedTime.toInt(), timeSeconds.toInt(), System.currentTimeMillis(), outputFile)
-
-                            if (elapsedTime >= timeSeconds){
-                                CaptureRepository.updateCaptureState(sessionId, false)
-                                CaptureRepository.updateDeviceCaptureProgress(sessionId, mac, elapsedTime.toInt(), elapsedTime.toInt(), System.currentTimeMillis(), outputFile)
-                                CaptureRepository.updateDeviceCaptureState(sessionId, mac, false)
-                                sendDeviceProgressUpdate(sessionId, mac, elapsedTime.toInt(), elapsedTime.toInt(), System.currentTimeMillis(), outputFile)
-                                uploadPcapToFirebase(context, outputFileName, outputFile, sessionId, mac)
-                            }
                         }
 
                         val exitCode = process.waitFor()
@@ -214,6 +245,9 @@ class PacketCapturer(private val context: Context) {
                     Handler(Looper.getMainLooper()).post {
                         CaptureRepository.updateDeviceCaptureState(sessionId, mac, false)
                     }
+                } catch (e: Exception) {
+                    Log.e("CAPTURE", "Error in capture thread for $key", e)
+                    callback(false, "Error: ${e.message}")
                 } finally {
                     timeCaptureThreads.remove(key)
                 }
