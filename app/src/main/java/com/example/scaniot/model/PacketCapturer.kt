@@ -117,9 +117,18 @@ class PacketCapturer(private val context: Context) {
 
                         process.waitFor()
                     }
+                } catch (e: InterruptedException) {
+                    Log.d("CAPTURE", "Thread interrupted for $key")
+                    val currentTime = System.currentTimeMillis()
+                    Handler(Looper.getMainLooper()).post {
+                        CaptureRepository.updateDeviceCaptureProgress(sessionId, mac, 0, packetCount, currentTime, outputFile)
+                        CaptureRepository.updateDeviceCaptureState(sessionId, mac, false)
+                    }
                 } catch (e: Exception) {
                     Log.e("TCPDUMP", "Error capturing for MAC $mac", e)
+                    val currentTime = System.currentTimeMillis()
                     Handler(Looper.getMainLooper()).post {
+                        CaptureRepository.updateDeviceCaptureProgress(sessionId, mac, 0, packetCount, currentTime, outputFile)
                         CaptureRepository.updateDeviceCaptureState(sessionId, mac, false)
                     }
                 } finally {
@@ -129,7 +138,9 @@ class PacketCapturer(private val context: Context) {
 
             captureThread.setUncaughtExceptionHandler { _, e ->
                 Log.e("CAPTURE", "Error in capture thread", e)
+                val currentTime = System.currentTimeMillis()
                 Handler(Looper.getMainLooper()).post {
+                    CaptureRepository.updateDeviceCaptureProgress(sessionId, mac, 0, packetCount, currentTime, outputFile)
                     CaptureRepository.updateDeviceCaptureState(sessionId, mac, false)
                 }
                 timeCaptureThreads.remove(key)
@@ -147,7 +158,7 @@ class PacketCapturer(private val context: Context) {
         val totalSeconds = timeLimit / 1000
         val UPDATE_INTERVAL = max(1, totalSeconds / 20)
         val UI_UPDATE_PERCENT = 1
-        val FIREBASE_UPDATE_PERCENT = 10
+        val FIREBASE_UPDATE_PERCENT = 5
 
         macList.forEach { mac ->
 
@@ -192,6 +203,15 @@ class PacketCapturer(private val context: Context) {
                             val elapsedTime = ((currentTime - startTime) / 1000).toInt()
                             val currentProgressPercent = (elapsedTime * 100) / timeSeconds.toInt()
 
+                            sendDeviceProgressUpdate(
+                                sessionId,
+                                mac,
+                                elapsedTime,
+                                timeSeconds.toInt(),
+                                currentTime,
+                                outputFile
+                            )
+
                             // UI update (1%)
                             if (currentProgressPercent > lastUIProgressPercent) {
                                 sendDeviceProgressUpdate(
@@ -206,7 +226,7 @@ class PacketCapturer(private val context: Context) {
                                 Log.d("UI Progress", "UI Update: $currentProgressPercent%")
                             }
 
-                            // Firebase Update (10%)
+                            // Firebase Update (5%)
                             if (currentProgressPercent > lastFirebaseProgressPercent &&
                                 currentProgressPercent % FIREBASE_UPDATE_PERCENT == 0) {
                                 CaptureRepository.updateDeviceCaptureProgress(
@@ -242,11 +262,18 @@ class PacketCapturer(private val context: Context) {
                     }
                 } catch (e: InterruptedException) {
                     Log.d("CAPTURE", "Thread interrupted for $key")
+                    val currentTime = System.currentTimeMillis()
                     Handler(Looper.getMainLooper()).post {
+                        CaptureRepository.updateDeviceCaptureProgress(sessionId, mac, 0, totalSeconds.toInt(), currentTime, outputFile)
                         CaptureRepository.updateDeviceCaptureState(sessionId, mac, false)
                     }
                 } catch (e: Exception) {
                     Log.e("CAPTURE", "Error in capture thread for $key", e)
+                    val currentTime = System.currentTimeMillis()
+                    Handler(Looper.getMainLooper()).post {
+                        CaptureRepository.updateDeviceCaptureProgress(sessionId, mac, 0, totalSeconds.toInt(), currentTime, outputFile)
+                        CaptureRepository.updateDeviceCaptureState(sessionId, mac, false)
+                    }
                     callback(false, "Error: ${e.message}")
                 } finally {
                     timeCaptureThreads.remove(key)
@@ -255,7 +282,9 @@ class PacketCapturer(private val context: Context) {
 
             captureThread.setUncaughtExceptionHandler { _, e ->
                 Log.e("CAPTURE", "Error in capture thread", e)
+                val currentTime = System.currentTimeMillis()
                 Handler(Looper.getMainLooper()).post {
+                    CaptureRepository.updateDeviceCaptureProgress(sessionId, mac, 0, totalSeconds.toInt(), currentTime, outputFile)
                     CaptureRepository.updateDeviceCaptureState(sessionId, mac, false)
                 }
                 timeCaptureThreads.remove(key)

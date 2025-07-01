@@ -59,7 +59,7 @@ object TcpdumpUtils {
                     } else {
                         Toast.makeText(
                             context,
-                            "Tcpdump command not available, please install following the tutorial in the system requirements tab",
+                            "Tcpdump command not available, please install following the tutorial in the system requirements tab. If you have already installed it, restart your device. ",
                             Toast.LENGTH_LONG
                         ).show()
                         callback(false)
@@ -91,7 +91,7 @@ object TcpdumpUtils {
                     } else {
                         Toast.makeText(
                             context,
-                            "Timeout command not available, please install following the tutorial in the system requirements tab",
+                            "Timeout command not available, please install following the tutorial in the system requirements tab. If you have already installed it, restart your device.",
                             Toast.LENGTH_LONG
                         ).show()
                         callback(false)

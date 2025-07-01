@@ -129,6 +129,10 @@ Type 'su' in Termux. If the prompt changes to #, root access is working.
 ✔  Activate the hotspot on the cell phone running the app.
 ✔  Connect the devices you want to scan and capture packets from to this hotspot.
 
+🔋 BATTERY WARNING:
+⚠️ Keep your phone battery above 25% while capturing packets.
+Low power mode may kill app threads and interrupt the capture process.
+
 ✅ After this, return to the app and use its features normally.
 
 

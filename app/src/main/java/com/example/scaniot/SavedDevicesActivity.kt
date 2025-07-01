@@ -314,7 +314,7 @@ class SavedDevicesActivity : AppCompatActivity() {
     private fun showTimeoutMessage() {
         AlertDialog.Builder(this)
             .setTitle("Timeout is not installed\n")
-            .setMessage("Timeout is required for packet capture by time limit. Please install it by following the tutorial in the system requirements tab")
+            .setMessage("Timeout is required for packet capture by time limit. Please install it by following the tutorial in the system requirements tab. If you have already installed it, restart your device.")
             .setPositiveButton("Ok") { _, _ ->
             }
             .show()
@@ -323,7 +323,7 @@ class SavedDevicesActivity : AppCompatActivity() {
     private fun showTcpdumpMessage() {
         AlertDialog.Builder(this)
             .setTitle("Tcpdump is not installed\n")
-            .setMessage("Tcpdump is required for packet capture by time limit. Please install it by following the tutorial in the system requirements tab")
+            .setMessage("Tcpdump is required for packet capture by time limit. Please install it by following the tutorial in the system requirements tab. If you have already installed it, restart your device.")
             .setPositiveButton("Ok") { _, _ ->
             }
             .show()
