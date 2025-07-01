@@ -76,24 +76,4 @@ class LoginViewModel : ViewModel() {
                 }
             }
     }
-
-    fun sendVerificationEmail() {
-        val user = firebaseAuth.currentUser
-        user?.sendEmailVerification()
-            ?.addOnCompleteListener { task ->
-                if (task.isSuccessful) {
-                    Log.d("EmailVerification", "email sent")
-                } else {
-                    Log.e("EmailVerification", "failed to send email", task.exception)
-                }
-            }
-    }
-
-    fun validateFields(): Boolean {
-        return when {
-            email.isEmpty() -> false
-            password.isEmpty() -> false
-            else -> true
-        }
-    }
 }

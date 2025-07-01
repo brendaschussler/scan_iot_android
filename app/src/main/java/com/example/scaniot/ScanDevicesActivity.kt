@@ -2,6 +2,7 @@ package com.example.scaniot
 
 import android.app.AlertDialog
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.net.Uri
 import android.os.Build
@@ -10,6 +11,8 @@ import android.provider.MediaStore
 import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
+import android.widget.ArrayAdapter
+import android.widget.AutoCompleteTextView
 import android.widget.Button
 import android.widget.ImageView
 import android.widget.Toast
@@ -23,13 +26,20 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import com.example.scaniot.databinding.ActivityScanDevicesBinding
 import com.example.scaniot.helper.Permissions
 import com.example.scaniot.model.Device
+import com.example.scaniot.model.NetworkScanner
 import com.example.scaniot.model.ScanDevicesAdapter
+import com.example.scaniot.utils.RootUtils
 import com.google.android.material.textfield.TextInputEditText
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.storage.FirebaseStorage
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.io.ByteArrayOutputStream
 import java.util.UUID
+import android.widget.SearchView
 
 class ScanDevicesActivity : AppCompatActivity() {
 
@@ -60,74 +70,22 @@ class ScanDevicesActivity : AppCompatActivity() {
 
     val currentUserId = firebaseAuth.currentUser?.uid ?: ""
 
-    val scannedDevices = listOf(
-        Device(
-            ip = "192.168.1.111",
-            mac = "55:1A:2B:3C:4D:95",
-            name = "Smart TV",
-            description = "Samsung 4K UHD Smart TV",
-            vendor = "Samsung",
-            deviceModel = "QN65Q80AAFXZA",
-            deviceLocation = "Living Room",
-            deviceVersion = "T-KT2DEUC-2305.5",
-            deviceType = "television",
-            userId = currentUserId
-        ),
-        Device(
-            ip = "192.168.1.102",
-            mac = "00:1B:2C:3D:4E:5F",
-            name = "My Smartphone",
-            description = "Personal Android Phone",
-            vendor = "Xiaomi",
-            deviceModel = "Redmi Note 10 Pro",
-            deviceLocation = "Bedroom",
-            deviceVersion = "Android 13",
-            deviceType = "smartphone",
-            userId = currentUserId
-        ),
-        Device(
-            ip = "192.168.1.103",
-            mac = "00:1C:2D:3E:4F:5A",
-            name = "Work Laptop",
-            description = "Company issued Macbook",
-            vendor = "Apple",
-            deviceModel = "MacBook Air M2",
-            deviceLocation = "Home Office",
-            deviceVersion = "macOS 14.0",
-            deviceType = "laptop",
-            userId = currentUserId
-        ),
-        Device(
-            ip = "192.168.1.104",
-            mac = "00:1D:2E:3F:4A:5B",
-            name = "Bedroom Light",
-            description = "RGB Smart Bulb",
-            vendor = "Philips",
-            deviceModel = "Hue White and Color",
-            deviceLocation = "Master Bedroom",
-            deviceVersion = "1.93.3",
-            deviceType = "light",
-            userId = currentUserId
-        ),
-        Device(
-            ip = "192.168.1.105",
-            mac = "00:1E:2F:3A:4B:5C",
-            name = "Front Door Camera",
-            description = "Outdoor Security Camera",
-            vendor = "TP-Link",
-            deviceModel = "Tapo C310",
-            deviceLocation = "Front Entrance",
-            deviceVersion = "1.1.9 Build 20230905",
-            deviceType = "camera",
-            userId = currentUserId
-        )
-    )
+    private val scannedDevices = mutableListOf<Device>()
+    private lateinit var networkScanner: NetworkScanner
 
     private val valPermissions = listOf(
         android.Manifest.permission.CAMERA,
         android.Manifest.permission.READ_EXTERNAL_STORAGE,
-        android.Manifest.permission.READ_MEDIA_IMAGES
+        android.Manifest.permission.WRITE_EXTERNAL_STORAGE,
+        android.Manifest.permission.MANAGE_EXTERNAL_STORAGE,
+        android.Manifest.permission.READ_MEDIA_IMAGES,
+        android.Manifest.permission.ACCESS_WIFI_STATE,
+        android.Manifest.permission.ACCESS_NETWORK_STATE,
+        android.Manifest.permission.CHANGE_WIFI_STATE,
+        android.Manifest.permission.INTERNET
     )
+
+    private var allDevices = emptyList<Device>()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -142,7 +100,8 @@ class ScanDevicesActivity : AppCompatActivity() {
 
         initializeToolbar()
         setupRecyclerView()
-        startScanningDevices()
+        initializeClickEvents()
+        setupSearchView()
 
         openGalleryLauncher = registerForActivityResult(ActivityResultContracts.GetContent()) { uri ->
             if (uri != null) {
@@ -164,11 +123,15 @@ class ScanDevicesActivity : AppCompatActivity() {
 
                 bitmap?.let {
                     bitmapSelectedImage = it
-                    uriSelectedImage = null // Limpa a URI se houver
+                    uriSelectedImage = null
                     currentDialogView?.findViewById<ImageView>(R.id.selectedImageDevice)?.setImageBitmap(it)
                 }
             }
         }
+
+        networkScanner = NetworkScanner(this)
+        binding.progressBarCircular.visibility = View.GONE
+
 
         ViewCompat.setOnApplyWindowInsetsListener(findViewById(R.id.main)) { v, insets ->
             val systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
@@ -177,10 +140,86 @@ class ScanDevicesActivity : AppCompatActivity() {
         }
     }
 
-    private fun startScanningDevices() {
+    private fun setupSearchView() {
+        binding.searchView.setOnQueryTextListener(object : SearchView.OnQueryTextListener {
+            override fun onQueryTextSubmit(query: String?): Boolean {
+                return false
+            }
+
+            override fun onQueryTextChange(newText: String?): Boolean {
+                filterDevices(newText.orEmpty())
+                return true
+            }
+        })
+    }
+
+    private fun filterDevices(query: String) {
+        val filteredList = if (query.isEmpty()) {
+            allDevices
+        } else {
+            allDevices.filter { device ->
+                device.name?.contains(query, ignoreCase = true) == true ||
+                        device.mac?.contains(query, ignoreCase = true) == true ||
+                        device.ip?.contains(query, ignoreCase = true) == true ||
+                        device.vendor?.contains(query, ignoreCase = true) == true ||
+                        device.deviceModel?.contains(query, ignoreCase = true) == true ||
+                        device.deviceType?.contains(query, ignoreCase = true) == true ||
+                        device.deviceCategory?.contains(query, ignoreCase = true) == true
+            }
+        }
+        scanDevicesAdapter.addList(filteredList)
+    }
+
+    private fun initializeClickEvents() {
         binding.btnStartScan.setOnClickListener {
-            //loadDevices()
-            loadDevicesWithSavedData()
+
+            binding.btnStartScan.isEnabled = false
+            binding.progressBarCircular.visibility = View.VISIBLE
+            binding.rvListScanDevices.visibility = View.GONE
+
+            RootUtils.checkRootAccess(this) { hasRoot ->
+                if (hasRoot) {
+                    startScanningDevices()
+                } else {
+                    binding.btnStartScan.isEnabled = true
+                    binding.progressBarCircular.visibility = View.GONE
+                    binding.rvListScanDevices.visibility = View.GONE
+                }
+            }
+        }
+    }
+
+    private fun startScanningDevices() {
+        CoroutineScope(Dispatchers.Main).launch {
+            try {
+                val discoveredDevices = withContext(Dispatchers.IO) {
+                    networkScanner.getConnectedHotspotDevices()
+                }
+
+                scannedDevices.clear()
+                scannedDevices.addAll(discoveredDevices)
+
+                if (scannedDevices.isEmpty()) {
+                    Toast.makeText(
+                        this@ScanDevicesActivity,
+                        "No devices found on the network",
+                        Toast.LENGTH_SHORT
+                    ).show()
+                }
+
+                loadDevicesWithSavedData()
+            } catch (e: Exception) {
+                Toast.makeText(
+                    this@ScanDevicesActivity,
+                    "Network scanning error: ${e.message}",
+                    Toast.LENGTH_SHORT
+                ).show()
+                Log.e("NetworkScan", "Network scanning error", e)
+            } finally {
+                binding.rvListScanDevices.visibility = View.VISIBLE
+                binding.btnStartScan.isEnabled = true
+                binding.progressBarCircular.visibility = View.GONE
+            }
         }
     }
 
@@ -204,48 +243,42 @@ class ScanDevicesActivity : AppCompatActivity() {
                     .addOnSuccessListener { notSavedDocuments ->
                         val existingNotSavedDevices = notSavedDocuments.map { it.toObject(Device::class.java) }
 
-                        // Identificar novos dispositivos escaneados que não estão salvos
                         val newDevices = scannedDevices.filter { scannedDevice ->
                             !savedDevices.any { it.mac == scannedDevice.mac } &&
                                     !existingNotSavedDevices.any { it.mac == scannedDevice.mac }
                         }
 
-                        // Adicionar novos dispositivos à coleção de não salvos
                         if (newDevices.isNotEmpty()) {
                             saveNewDevicesToNotSaved(newDevices)
                         }
 
-                        // Lista para armazenar dispositivos que precisam atualizar o IP no Firebase
                         val devicesToUpdate = mutableListOf<Device>()
 
-                        // Criar lista final combinando informações
-                        val allDevices = scannedDevices.map { scannedDevice ->
+                        allDevices = scannedDevices.map { scannedDevice ->
                             when {
-                                // Dispositivo salvo - mantém todas as informações salvas, mas atualiza o IP
                                 savedDevices.any { it.mac == scannedDevice.mac } -> {
                                     val savedDevice = savedDevices.first { it.mac == scannedDevice.mac }
                                     if (savedDevice.ip != scannedDevice.ip) {
-                                        // Se o IP mudou, adiciona à lista de atualização
                                         devicesToUpdate.add(savedDevice.copy(ip = scannedDevice.ip))
                                     }
                                     savedDevice.copy(
-                                        ip = scannedDevice.ip, // Atualiza apenas o IP
+                                        ip = scannedDevice.ip,
                                         isNew = false
                                     )
                                 }
-                                // Dispositivo não salvo mas já escaneado antes
+
                                 existingNotSavedDevices.any { it.mac == scannedDevice.mac } -> {
                                     val notSavedDevice = existingNotSavedDevices.first { it.mac == scannedDevice.mac }
                                     notSavedDevice.copy(
-                                        ip = scannedDevice.ip // Atualiza apenas o IP
+                                        ip = scannedDevice.ip
                                     )
                                 }
-                                // Novo dispositivo nunca visto antes
+                                // New device
                                 else -> scannedDevice.copy(isNew = true)
                             }
                         }
 
-                        // Atualizar IPs no Firebase se necessário
+                        // Updates IPs on Firebase if necessary
                         if (devicesToUpdate.isNotEmpty()) {
                             updateIpsInFirebase(devicesToUpdate)
                         }
@@ -277,10 +310,10 @@ class ScanDevicesActivity : AppCompatActivity() {
 
         batch.commit()
             .addOnSuccessListener {
-                Log.d("ScanDevices", "IPs atualizados com sucesso para ${devices.size} dispositivos")
+
             }
             .addOnFailureListener { e ->
-                Log.e("ScanDevices", "Erro ao atualizar IPs: ${e.message}")
+                Log.e("ScanDevices", "Error when updating IPs: ${e.message}")
             }
     }
 
@@ -297,7 +330,7 @@ class ScanDevicesActivity : AppCompatActivity() {
         }
 
         batch.commit().addOnCompleteListener {
-             // list will be updated on next loading
+            // list will be updated on next loading
         }
     }
 
@@ -307,8 +340,8 @@ class ScanDevicesActivity : AppCompatActivity() {
             onEditClick = { device ->
                 showEditDialog(device)
             },
-            savedDevices = emptyList(), // Será atualizado em loadDevicesWithSavedData
-            scannedNotSavedDevices = emptyList() // Será atualizado em loadDevicesWithSavedData
+            savedDevices = emptyList(),
+            scannedNotSavedDevices = emptyList()
         )
 
         binding.rvListScanDevices.apply {
@@ -326,6 +359,42 @@ class ScanDevicesActivity : AppCompatActivity() {
         val dialogView = LayoutInflater.from(this).inflate(R.layout.dialog_edit_device, null)
         currentDialogView = dialogView
 
+        val categories = arrayOf(
+            "Camera",
+            "Game Console",
+            "Hub/Gateway",
+            "Laptop",
+            "Medical Device",
+            "Network Storage (NAS)",
+            "Printer",
+            "Router/Access Point",
+            "Sensor",
+            "Smart Appliance",
+            "Smart Doorbell",
+            "Smart Light",
+            "Smart Lock",
+            "Smart Plug",
+            "Smart Speaker",
+            "Smart Thermostat",
+            "Smart TV",
+            "Smartwatch",
+            "Smartphone",
+            "Sound System",
+            "Tablet",
+            "Vehicle",
+            "Voice Assistants",
+            "Wearable",
+            "Other"
+        )
+
+        val adapter = ArrayAdapter(this, android.R.layout.simple_dropdown_item_1line, categories)
+        val categoryInput = dialogView.findViewById<AutoCompleteTextView>(R.id.editCategory)
+        categoryInput.setAdapter(adapter)
+
+        device.deviceCategory?.let {
+            categoryInput.setText(it, false)
+        }
+
         dialogView.apply {
             findViewById<TextInputEditText>(R.id.editName).setText(device.name)
             findViewById<TextInputEditText>(R.id.editDescription).setText(device.description)
@@ -342,10 +411,12 @@ class ScanDevicesActivity : AppCompatActivity() {
 
         dialogView.findViewById<Button>(R.id.btnOpenCamera).setOnClickListener {
             val cameraIntent = Intent(MediaStore.ACTION_IMAGE_CAPTURE)
-            if (cameraIntent.resolveActivity(packageManager) != null) {
+            val activities = packageManager.queryIntentActivities(cameraIntent, PackageManager.MATCH_ALL)
+
+            if (activities.isNotEmpty()) {
                 openCameraLauncher.launch(cameraIntent)
             } else {
-                Toast.makeText(this, "No camera app found", Toast.LENGTH_SHORT).show()
+                Toast.makeText(this, "No camera app available", Toast.LENGTH_LONG).show()
             }
         }
 
@@ -360,7 +431,8 @@ class ScanDevicesActivity : AppCompatActivity() {
                     deviceModel = dialogView.findViewById<TextInputEditText>(R.id.editModel).text.toString(),
                     deviceLocation = dialogView.findViewById<TextInputEditText>(R.id.editLocation).text.toString(),
                     deviceVersion = dialogView.findViewById<TextInputEditText>(R.id.editVersion).text.toString(),
-                    deviceType = dialogView.findViewById<TextInputEditText>(R.id.editType).text.toString()
+                    deviceType = dialogView.findViewById<TextInputEditText>(R.id.editType).text.toString(),
+                    deviceCategory = dialogView.findViewById<AutoCompleteTextView>(R.id.editCategory).text.toString()
                 )
                 saveDeviceToUserCollection(editedDevice)
                 loadDevicesWithSavedData()
@@ -402,7 +474,6 @@ class ScanDevicesActivity : AppCompatActivity() {
                             val updatedDeviceGlr = device.copy(photoUrl = urlFirebase.toString())
 
                             updateDeviceData(thisMac, dados)
-                            //scanDevicesAdapter.updateDevice(updatedDeviceGlr)
                             loadDevicesWithSavedData()
                         }
                 }
@@ -425,7 +496,6 @@ class ScanDevicesActivity : AppCompatActivity() {
                             val updatedDeviceCam = device.copy(photoUrl = urlFirebase.toString())
 
                             updateDeviceData(thisMac, dados)
-                            //scanDevicesAdapter.updateDevice(updatedDeviceCam)
                             loadDevicesWithSavedData()
 
                         }
@@ -477,7 +547,8 @@ class ScanDevicesActivity : AppCompatActivity() {
     }
 
     private fun loadDevices() {
-        scanDevicesAdapter.addList(scannedDevices)
+        allDevices = scannedDevices
+        scanDevicesAdapter.addList(allDevices)
     }
 
     private fun initializeToolbar() {

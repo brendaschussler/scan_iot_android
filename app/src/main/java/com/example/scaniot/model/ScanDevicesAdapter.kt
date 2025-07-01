@@ -1,6 +1,5 @@
 package com.example.scaniot.model
 
-import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -37,14 +36,13 @@ class ScanDevicesAdapter(
                 txtLocation.text = device.deviceLocation
                 txtVersion.text = device.deviceVersion
                 txtType.text = device.deviceType
+                txtCategory.text = device.deviceCategory ?: "Not specified"
                 imgNew.visibility = if (device.isNew) View.VISIBLE else View.GONE
 
-                // Verifica se o dispositivo não está em nenhuma das listas
                 val isNewDevice = !savedDevices.any { it.mac == device.mac } &&
                         !scannedNotSavedDevices.any { it.mac == device.mac }
 
                 imgNew.visibility = if (isNewDevice) View.VISIBLE else View.GONE
-
 
                 if (device.photoUrl != null) {
                     Glide.with(itemView.context)

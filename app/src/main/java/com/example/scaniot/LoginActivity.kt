@@ -1,6 +1,5 @@
 package com.example.scaniot
 
-import android.app.Activity
 import android.app.AlertDialog
 import android.content.Intent
 import android.os.Bundle
@@ -70,9 +69,6 @@ class LoginActivity : AppCompatActivity() {
             .setTitle("Verify your email adress")
             .setMessage("We sent you an email to ${firebaseAuth.currentUser?.email}. " +
                     "Click on the link in that email to verify your account.")
-            /*.setPositiveButton("Resend Verfication Email") { _, _ ->
-                viewModel.sendVerificationEmail()
-            }*/
             .setNegativeButton("Close") { _, _ ->
                 FirebaseAuth.getInstance().signOut()
             }

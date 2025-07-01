@@ -1,12 +1,15 @@
+
 package com.example.scaniot
 
 import android.app.AlertDialog
+import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
+import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
-import android.view.View
 import android.widget.Toast
 import androidx.activity.enableEdgeToEdge
 import androidx.appcompat.app.AppCompatActivity
@@ -15,9 +18,9 @@ import androidx.core.view.WindowInsetsCompat
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.example.scaniot.databinding.ActivityCapturedPacketsBinding
 import com.example.scaniot.model.CaptureRepository
-import com.example.scaniot.LoginActivity
 import com.example.scaniot.model.CapturedPacketsAdapter
 import com.example.scaniot.model.Device
+import com.example.scaniot.model.PacketCapturer
 import com.google.firebase.auth.FirebaseAuth
 
 class CapturedPacketsActivity : AppCompatActivity() {
@@ -29,8 +32,40 @@ class CapturedPacketsActivity : AppCompatActivity() {
         FirebaseAuth.getInstance()
     }
 
-    private val updateHandler = Handler(Looper.getMainLooper())
-    private val updateInterval = 2000L // 2 segundos
+    private val progressReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context, intent: Intent) {
+            when (intent.action) {
+                PacketCapturer.PROGRESS_UPDATE_ACTION -> {
+                    val sessionId = intent.getStringExtra(PacketCapturer.EXTRA_SESSION_ID)
+                    val mac = intent.getStringExtra("mac") ?: return
+                    val progress = intent.getIntExtra(PacketCapturer.EXTRA_PROGRESS, 0)
+                    val total = intent.getIntExtra(PacketCapturer.EXTRA_TOTAL, 100)
+                    val end = intent.getLongExtra(PacketCapturer.EXTRA_END, System.currentTimeMillis())
+                    val filename = intent.getStringExtra(PacketCapturer.EXTRA_FILENAME) ?: return
+
+                    // Update the specific device in the list
+                    val currentList = capturedPacketsAdapter.currentList.toMutableList()
+                    val position = currentList.indexOfFirst {
+                        it.mac == mac && it.sessionId == sessionId
+                    }
+
+                    if (position != -1) {
+                        val device = currentList[position].copy(
+                            captureProgress = progress,
+                            captureTotal = total,
+                            endDate = end,
+                            filename = filename,
+                            capturing = progress < total
+                        )
+                        currentList[position] = device
+                        capturedPacketsAdapter.submitList(currentList)
+
+                    }
+
+                }
+            }
+        }
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -42,13 +77,27 @@ class CapturedPacketsActivity : AppCompatActivity() {
         initializeToolbar()
         setupRecyclerView()
         setupSwipeRefresh()
-        loadSelectedDevices()
+        loadCaptureSessions()
+
+        Handler(Looper.getMainLooper()).postDelayed({
+            refreshData()
+        }, 1000)
+
+        val filter = IntentFilter(PacketCapturer.PROGRESS_UPDATE_ACTION)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            registerReceiver(progressReceiver, filter, Context.RECEIVER_NOT_EXPORTED)
+        }
 
         ViewCompat.setOnApplyWindowInsetsListener(findViewById(R.id.main)) { v, insets ->
             val systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
             v.setPadding(systemBars.left, systemBars.top, systemBars.right, systemBars.bottom)
             insets
         }
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        unregisterReceiver(progressReceiver)
     }
 
     private fun setupSwipeRefresh() {
@@ -62,10 +111,24 @@ class CapturedPacketsActivity : AppCompatActivity() {
             binding.swipeRefreshLayout.isRefreshing = true
         }
 
-        CaptureRepository.getAllCapturedDevices(
-            onSuccess = { devices ->
-                val processedDevices = processDevices(devices)
-                updateDeviceList(processedDevices)
+        CaptureRepository.getAllCaptureSessions(
+            onSuccess = { sessions ->
+                val allDevices = sessions.flatMap { session ->
+                    session.devices.map { device ->
+                        // Verifica se a captura está marcada como ativa mas não tem thread em execução
+                        if (device.capturing) {
+                            val key = "${device.sessionId}_${device.mac.lowercase()}"
+                            val isActuallyRunning = PacketCapturer.timeCaptureThreads.containsKey(key)
+                            device.copy(
+                                sessionId = session.sessionId,
+                                capturing = isActuallyRunning
+                            )
+                        } else {
+                            device.copy(sessionId = session.sessionId)
+                        }
+                    }
+                }
+                updateDeviceList(allDevices)
                 binding.swipeRefreshLayout.isRefreshing = false
             },
             onFailure = {
@@ -75,19 +138,12 @@ class CapturedPacketsActivity : AppCompatActivity() {
         )
     }
 
-    private fun processDevices(devices: List<Device>): List<Device> {
-        return devices.sortedByDescending { it.lastCaptureTimestamp }
-    }
-
     private fun updateDeviceList(newDevices: List<Device>) {
-        // Verifica se houve mudanças antes de atualizar
-        if (capturedPacketsAdapter.currentList != newDevices) {
-            capturedPacketsAdapter.submitList(newDevices) {
-                // Callback opcional após a atualização
-                binding.rvListCapturedPackets.scrollToPosition(0)
-            }
+        capturedPacketsAdapter.submitList(newDevices) {
+            binding.rvListCapturedPackets.scrollToPosition(0)
         }
     }
+
 
     fun Context.showMessage(message: String) {
         Toast.makeText(this, message, Toast.LENGTH_SHORT).show()
@@ -98,63 +154,18 @@ class CapturedPacketsActivity : AppCompatActivity() {
         binding.rvListCapturedPackets.apply {
             adapter = capturedPacketsAdapter
             layoutManager = LinearLayoutManager(this@CapturedPacketsActivity)
-
-            isVerticalScrollBarEnabled = true
-            scrollBarStyle = View.SCROLLBARS_OUTSIDE_OVERLAY
         }
     }
 
-    private fun loadSelectedDevices() {
-        loadAllCapturedDevices()
+    private fun loadCaptureSessions() {
+        refreshData()
     }
-
-    private fun loadCapturedDevices() {
-        val forceRefresh = intent.getBooleanExtra("force_refresh", false)
-
-        if (forceRefresh || intent.getParcelableArrayListExtra<Device>("selected_devices") == null) {
-            // Carrega todo o histórico de capturas
-            loadAllCapturedDevices()
-        } else {
-            // Usa os dispositivos do intent (quando vem da SavedDevices)
-            val devices = intent.getParcelableArrayListExtra<Device>("selected_devices")!!
-            capturedPacketsAdapter.submitList(devices)
-        }
-    }
-
-    private fun loadAllCapturedDevices() {
-        CaptureRepository.getAllCapturedDevices(
-            onSuccess = { devices ->
-                // Ordena por timestamp decrescente e agrupa por sessão
-                val groupedDevices = devices
-                    .groupBy { it.sessionId }
-                    .flatMap { (_, sessionDevices) ->
-                        // Adiciona informação sobre o tipo de captura
-                        sessionDevices.map { device ->
-                            if (device.timeLimitMs > 0) {
-                                val hours = device.timeLimitMs / (3600 * 1000f)
-                                device.copy(name = "${device.name} (${"%.1f".format(hours)}h limit)")
-                            } else {
-                                device.copy(name = "${device.name} (${device.captureTotal} packets)")
-                            }
-                        }
-                    }
-                    .sortedByDescending { it.lastCaptureTimestamp }
-
-                capturedPacketsAdapter.submitList(groupedDevices)
-            },
-            onFailure = {
-                showMessage("Failed to load capture history")
-                finish()
-            }
-        )
-    }
-
 
     private fun initializeToolbar() {
         val toolbar = binding.includeTbCapturedPackets.tbMain
         setSupportActionBar(toolbar)
         supportActionBar?.apply {
-            title = "Captured Packets"
+            title = "Capture Sessions"
             setDisplayHomeAsUpEnabled(true)
         }
 

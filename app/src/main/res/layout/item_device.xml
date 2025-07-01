@@ -19,13 +19,14 @@
         <ImageView
             android:id="@+id/imgDevice"
             android:layout_width="69dp"
-            android:layout_height="174dp"
+            android:layout_height="195dp"
             android:padding="3dp"
             android:paddingEnd="8dp"
             android:paddingRight="8dp"
             android:src="@drawable/ic_device_unknown"
+            app:layout_constraintBottom_toBottomOf="@+id/txtCategory"
             app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintTop_toTopOf="parent" />
+            app:layout_constraintTop_toTopOf="@+id/txtDeviceName" />
 
         <!-- Informações do dispositivo -->
 
@@ -33,15 +34,16 @@
 
         <TextView
             android:id="@+id/txtDeviceName"
-            android:layout_width="wrap_content"
+            android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:maxLength="25"
-            android:text="Device Name"
+            android:maxLines="2"
+            android:singleLine="false"
+            android:text="Device Name "
             android:textStyle="bold"
-            app:layout_constraintEnd_toStartOf="@+id/btnEditDevice"
+            app:layout_constraintEnd_toStartOf="@+id/img_new"
             app:layout_constraintHorizontal_bias="0.0"
             app:layout_constraintStart_toStartOf="@+id/txtDescription"
-            app:layout_constraintTop_toTopOf="@+id/imgDevice" />
+            app:layout_constraintTop_toTopOf="parent" />
 
         <TextView
             android:id="@+id/deviceIp"
@@ -66,11 +68,12 @@
 
         <TextView
             android:id="@+id/txtDescription"
-            android:layout_width="wrap_content"
+            android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:maxLength="25"
+            android:maxLines="2"
+            android:singleLine="false"
             android:text="Description"
-            app:layout_constraintEnd_toStartOf="@+id/btnEditDevice"
+            app:layout_constraintEnd_toStartOf="@+id/img_new"
             app:layout_constraintHorizontal_bias="0.0"
             app:layout_constraintStart_toEndOf="@+id/imgDevice"
             app:layout_constraintTop_toBottomOf="@+id/txtDeviceName" />
@@ -81,6 +84,7 @@
             android:layout_height="wrap_content"
             android:layout_marginStart="2dp"
             android:text="MAC Adress"
+            app:layout_constraintBottom_toBottomOf="@+id/textView9"
             app:layout_constraintStart_toEndOf="@+id/textView9"
             app:layout_constraintTop_toBottomOf="@+id/txtIpAdress" />
 
@@ -90,7 +94,7 @@
             android:layout_height="wrap_content"
             android:text="MAC:"
             app:layout_constraintStart_toEndOf="@+id/imgDevice"
-            app:layout_constraintTop_toBottomOf="@+id/deviceIp" />
+            app:layout_constraintTop_toBottomOf="@+id/txtIpAdress" />
 
         <TextView
             android:id="@+id/txtIpAdress"
@@ -98,6 +102,7 @@
             android:layout_height="wrap_content"
             android:layout_marginStart="2dp"
             android:text="IP Adress"
+            app:layout_constraintBottom_toBottomOf="@+id/deviceIp"
             app:layout_constraintEnd_toStartOf="@+id/btnEditDevice"
             app:layout_constraintHorizontal_bias="0.0"
             app:layout_constraintStart_toEndOf="@+id/deviceIp"
@@ -107,17 +112,21 @@
             android:id="@+id/textView11"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
+            android:layout_marginTop="1dp"
             android:text="Vendor:"
             app:layout_constraintStart_toEndOf="@+id/imgDevice"
-            app:layout_constraintTop_toBottomOf="@+id/textView9" />
+            app:layout_constraintTop_toBottomOf="@+id/txtMacAdress" />
+
 
         <TextView
             android:id="@+id/txtVendor"
-            android:layout_width="wrap_content"
+            android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_marginStart="2dp"
-            android:maxLength="15"
+            android:maxLines="3"
+            android:singleLine="false"
             android:text="Vendor"
+            app:layout_constraintEnd_toStartOf="@id/btnEditDevice"
             app:layout_constraintStart_toEndOf="@+id/textView11"
             app:layout_constraintTop_toBottomOf="@+id/txtMacAdress" />
 
@@ -127,14 +136,17 @@
             android:layout_height="wrap_content"
             android:text="Model:"
             app:layout_constraintStart_toEndOf="@+id/imgDevice"
-            app:layout_constraintTop_toBottomOf="@+id/textView11" />
+            app:layout_constraintTop_toBottomOf="@+id/txtVendor" />
 
         <TextView
             android:id="@+id/txtModel"
-            android:layout_width="wrap_content"
+            android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_marginStart="2dp"
+            android:maxLines="2"
+            android:singleLine="false"
             android:text="Model"
+            app:layout_constraintEnd_toStartOf="@id/btnEditDevice"
             app:layout_constraintStart_toEndOf="@+id/textView12"
             app:layout_constraintTop_toBottomOf="@+id/txtVendor" />
 
@@ -142,16 +154,20 @@
             android:id="@+id/textView14"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
+            android:layout_marginTop="2dp"
             android:text="Location:"
             app:layout_constraintStart_toEndOf="@+id/imgDevice"
-            app:layout_constraintTop_toBottomOf="@+id/textView19" />
+            app:layout_constraintTop_toBottomOf="@+id/txtType" />
 
         <TextView
             android:id="@+id/txtLocation"
-            android:layout_width="wrap_content"
+            android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:layout_marginStart="2dp"
+            android:layout_marginStart="3dp"
+            android:maxLines="2"
+            android:singleLine="false"
             android:text="Location"
+            app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintStart_toEndOf="@+id/textView14"
             app:layout_constraintTop_toBottomOf="@+id/txtType" />
 
@@ -168,16 +184,20 @@
             android:id="@+id/textView16"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
+            android:layout_marginTop="1dp"
             android:text="Version:"
             app:layout_constraintStart_toEndOf="@+id/imgDevice"
-            app:layout_constraintTop_toBottomOf="@+id/textView12" />
+            app:layout_constraintTop_toTopOf="@+id/txtVersion" />
 
         <TextView
             android:id="@+id/txtVersion"
-            android:layout_width="wrap_content"
+            android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_marginStart="2dp"
+            android:maxLines="2"
+            android:singleLine="false"
             android:text="Version"
+            app:layout_constraintEnd_toStartOf="@id/btnEditDevice"
             app:layout_constraintStart_toEndOf="@+id/textView16"
             app:layout_constraintTop_toBottomOf="@+id/txtModel" />
 
@@ -185,18 +205,45 @@
             android:id="@+id/textView19"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
+            android:layout_marginTop="1dp"
             android:text="Type:"
             app:layout_constraintStart_toEndOf="@+id/imgDevice"
-            app:layout_constraintTop_toBottomOf="@+id/textView16" />
+            app:layout_constraintTop_toBottomOf="@+id/txtVersion" />
 
         <TextView
             android:id="@+id/txtType"
-            android:layout_width="wrap_content"
+            android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_marginStart="2dp"
+            android:maxLines="2"
+            android:singleLine="false"
             android:text="Type"
+            app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintStart_toEndOf="@+id/textView19"
             app:layout_constraintTop_toBottomOf="@+id/txtVersion" />
+
+        <TextView
+            android:id="@+id/textView21"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="3dp"
+            android:text="Category:"
+            app:layout_constraintBottom_toBottomOf="@+id/txtCategory"
+            app:layout_constraintStart_toEndOf="@+id/imgDevice"
+            app:layout_constraintTop_toBottomOf="@+id/txtLocation" />
+
+        <TextView
+            android:id="@+id/txtCategory"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="3dp"
+            android:text="Category"
+            android:maxLines="2"
+            android:singleLine="false"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintStart_toEndOf="@+id/textView21"
+            app:layout_constraintTop_toBottomOf="@+id/txtLocation" />
 
     </androidx.constraintlayout.widget.ConstraintLayout>
 </androidx.cardview.widget.CardView>

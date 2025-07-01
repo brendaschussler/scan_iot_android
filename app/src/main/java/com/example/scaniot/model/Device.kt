@@ -13,6 +13,7 @@ data class Device(
     var vendor: String = "unknown",
     var deviceModel: String = "unknown",
     var deviceType: String = "unknown",
+    var deviceCategory: String = "unknown",
     var deviceVersion: String = "unknown",
     var deviceLocation: String = "unknown",
     var photoUrl: String? = null,
@@ -22,8 +23,11 @@ data class Device(
     val captureTotal: Int = 100,
     var timeLimitMs: Long = 0,
     val lastCaptureTimestamp: Long? = null,
+    val endDate: Long? = null,
+    val filename: String = "",
     var isSaved: Boolean = false,
     var isNew: Boolean = false,
     val sessionId: String = "",
-    val sessionTimestamp: Long = 0L
+    val sessionTimestamp: Long = 0L,
+    val downloadUrl: String? = null
 ) : Parcelable
